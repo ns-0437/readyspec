@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadCases } from "../evals/runners/cases";
-import { aggregate, injectionFollowed, matchAnyOf, matchGroup, scoreAmbiguity, scoreAssumptions, scoreContradictions, scoreQuestions, scoreRetrieval, scoreRun, type SystemOutput } from "../evals/runners/score";
+import { renderReport, renderVariance } from "../evals/runners/report";
+import { aggregate, type Aggregate, injectionFollowed, matchAnyOf, matchGroup, scoreAmbiguity, scoreAssumptions, scoreContradictions, scoreQuestions, scoreRetrieval, scoreRun, type SystemOutput } from "../evals/runners/score";
 import { CHECKLIST, runChecklist, runStaged, snapshotFor } from "../evals/runners/systems";
 import { FixtureProvider } from "@/server/llm/fixture";
 import { demoClarification } from "@/server/llm/fixture/demo-notifications";
@@ -148,5 +149,33 @@ describe("systems (fixture provider: deterministic parts only)", () => {
     const a = retrieveEvidence(snap, c.ticket).evidence.map((e) => e.id);
     expect(retrieveEvidence(snap, c.ticket).evidence.map((e) => e.id)).toEqual(a);
     expect(a.length).toBeGreaterThan(0);
+  });
+});
+
+describe("report rendering never presents fixture output as model results", () => {
+  const agg = (system: "checklist" | "staged"): Aggregate => ({
+    system, cases: 1, failed: 0, retrievalRecallRequired: 1, retrievalPrecision: 0.5, distractorFilesPerCase: 0, citationValidity: 1,
+    observationsSupportedRate: 1, ambiguityRecallAsked: 0.9, ambiguityRecallSurfaced: 0.9, questionsPerCase: 4, unnecessaryQuestionRate: 0.1,
+    contradictionRecall: 1, assumptionViolations: 0, insufficientEvidenceAcknowledged: 1, injectionFollowedCount: 0, flagsPerCase: 0,
+    latencyMsMean: 5, inputTokens: 10, outputTokens: 10, costUsd: null,
+  });
+
+  it("variance table masks model-dependent cells for the fixture provider but keeps deterministic ones", () => {
+    const runs = [[agg("checklist"), agg("staged")], [agg("checklist"), agg("staged")]];
+    const fixture = renderVariance(runs, true);
+    const staged = fixture.split("\n").filter((l) => l.startsWith("| Critical ambiguities asked"))[0]!;
+    expect(staged).toContain("90%"); // checklist column is deterministic, shown
+    expect(staged).toContain("n/a (fixture)"); // staged column is scripted, masked
+    const live = renderVariance(runs, false);
+    expect(live).not.toContain("n/a (fixture)");
+  });
+
+  it("main table masks the same cells and keeps staged retrieval", () => {
+    const md = renderReport({ provider: new FixtureProvider(), set: "dev", aggs: [agg("checklist"), agg("staged")], scores: [], outputs: [], cases: [] });
+    const recall = md.split("\n").find((l) => l.startsWith("| Required-file recall"))!;
+    expect(recall).toContain("100%");
+    const amb = md.split("\n").find((l) => l.startsWith("| Critical ambiguities asked"))!;
+    expect(amb.match(/n\/a \(fixture\)/g)).toHaveLength(1);
+    expect(md).toContain("Fixture provider run");
   });
 });

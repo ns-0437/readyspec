@@ -1,0 +1,5 @@
+[project]
+name = "team-tasks"
+version = "0.0.1"
+description = "READYSPEC EVALUATION FIXTURE - fictional"
+requires-python = ">=3.10"

@@ -1,0 +1,7 @@
+{
+  "name": "shop-orders",
+  "version": "0.0.1",
+  "private": true,
+  "description": "READYSPEC EVALUATION FIXTURE - fictional",
+  "scripts": { "test": "node --test \"tests/*.test.ts\"" }
+}

@@ -107,6 +107,17 @@ describe("retrieval on the demo fixture", () => {
   });
 });
 
+describe("boilerplate down-weighting", () => {
+  it("ranks README-style files lower when the weight is below 1, and never drops recall of code files", () => {
+    const snap = createSnapshot(DEMO_REPO);
+    const on = retrieveEvidence(snap, DEMO_TICKET, { boilerplateWeight: 1 });
+    const off = retrieveEvidence(snap, DEMO_TICKET, { boilerplateWeight: 0.1 });
+    const rank = (r: typeof on) => r.evidence.findIndex((e) => /readme/i.test(e.path));
+    if (rank(on) >= 0 && rank(off) >= 0) expect(rank(off)).toBeGreaterThanOrEqual(rank(on));
+    expect(new Set(off.evidence.map((e) => e.path))).toContain("src/notifications/dispatcher.ts");
+  });
+});
+
 describe("evidence validation against the snapshot", () => {
   const snap = createSnapshot(DEMO_REPO);
   const ev = buildEvidence(snap, { path: "src/notifications/dispatcher.ts", startLine: 13, endLine: 17, symbol: "decideDelivery", score: 1, matchedTerms: [], retrievalReason: "test" });

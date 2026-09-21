@@ -209,6 +209,8 @@ export interface RetrievalOptions {
   maxItems: number;
   maxChars: number;
   maxPerFile: number;
+  /** Multiplier for README/changelog-style files, which match generic ticket words without describing behavior. */
+  boilerplateWeight: number;
   /** Keep hits scoring at least this fraction of the best hit. */
   relativeCutoff: number;
   /** Always keep at least this many top-scoring chunks, even below the cutoff (recall over precision at this stage). */
@@ -220,6 +222,7 @@ export const DEFAULT_RETRIEVAL: RetrievalOptions = {
   maxItems: 18,
   maxChars: 24_000,
   maxPerFile: 3,
+  boilerplateWeight: 0.5,
   relativeCutoff: 0.22,
   minItems: 6,
   maxReferenceHops: 6,
@@ -227,6 +230,9 @@ export const DEFAULT_RETRIEVAL: RetrievalOptions = {
 
 const overlaps = (a: { path: string; startLine: number; endLine: number }, b: { path: string; startLine: number; endLine: number }) =>
   a.path === b.path && a.startLine <= b.endLine && b.startLine <= a.endLine;
+
+const BOILERPLATE = /(^|\/)(readme|changelog|contributing|license|code_of_conduct)(\.[a-z]+)?$/i;
+export const isBoilerplate = (p: string): boolean => BOILERPLATE.test(p);
 
 export interface RetrievalResult {
   query: QueryTerm[];
@@ -239,7 +245,9 @@ export function retrieveEvidence(snapshot: Snapshot, ticket: string, options: Pa
   const opt = { ...DEFAULT_RETRIEVAL, ...options };
   const index = buildIndex(snapshot);
   const query = buildQuery(ticket);
-  const scored = scoreChunks(index, query);
+  const scored = scoreChunks(index, query)
+    .map((x) => (isBoilerplate(x.chunk.path) ? { ...x, score: x.score * opt.boilerplateWeight } : x))
+    .sort((a, b) => b.score - a.score);
   const top = scored[0]?.score ?? 0;
 
   const picked: (NewEvidence & { chars: number })[] = [];

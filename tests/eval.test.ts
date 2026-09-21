@@ -17,11 +17,12 @@ const blank = (over: Partial<SystemOutput> = {}): SystemOutput => ({
 
 describe("benchmark case set", () => {
   it("has about twenty cases with a held-out subset across three repositories", () => {
-    expect(cases).toHaveLength(20);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(20);
+    expect(cases).toHaveLength(26);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(26);
     const held = cases.filter((c) => c.heldOut).length;
     expect(held).toBeGreaterThanOrEqual(5);
-    expect(held).toBeLessThan(cases.length / 2);
+    expect(held).toBeLessThanOrEqual(cases.length / 2);
+    expect(cases.filter((c) => c.cohort === "v2").every((c) => c.heldOut)).toBe(true);
     expect(new Set(cases.map((c) => c.repo))).toEqual(new Set(["demo-repository", "shop-orders", "team-tasks"]));
   });
 

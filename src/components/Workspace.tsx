@@ -127,10 +127,12 @@ export function Workspace({ id }: { id: string }) {
           onConsentAnalyze={() => act(() => api.analyze(id))}
           onSubmitAnswers={(answers) => act(async () => { if (answers.length) await api.answers(id, answers); await api.generateBrief(id); })}
           onFollowUp={() => act(() => api.followUp(id))}
+          onDeclineFollowUp={() => act(() => api.declineFollowUp(id))}
           onSelectEvidence={(eid) => { setEvidenceId(eid); }}
         />
         <EvidenceExplorer
           evidence={detail.evidence}
+          pending={detail.pendingEvidence}
           trace={trace}
           criterionText={criterionText}
           selectedEvidence={evidenceId}

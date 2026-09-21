@@ -35,6 +35,7 @@ export const api = {
   approve: (id: string, reviewer: string, note: string, acknowledgeOpenItems: boolean) =>
     request(`/api/sessions/${id}/approve`, SessionDetail, { method: "POST", body: JSON.stringify({ reviewer, note, acknowledgeOpenItems }) }),
   followUp: (id: string) => request(`/api/sessions/${id}/followup`, Accepted, { method: "POST" }),
+  declineFollowUp: (id: string) => request(`/api/sessions/${id}/followup/decline`, Accepted, { method: "POST" }),
   cancel: (id: string) => request(`/api/sessions/${id}/cancel`, z.object({ cancelled: z.boolean() }), { method: "POST" }),
   resume: (id: string) => request(`/api/sessions/${id}/resume`, Accepted, { method: "POST" }),
   exportUrl: (id: string, format: "md" | "json") => `/api/sessions/${id}/export?format=${format}`,

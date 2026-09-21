@@ -103,8 +103,9 @@ export function TraceInspector({ trace, evidence, activeEvidence, onSelectEviden
   );
 }
 
-export function EvidenceExplorer({ evidence, trace, criterionText, selectedEvidence, onSelectEvidence, onClearTrace, verification }: {
+export function EvidenceExplorer({ evidence, pending = [], trace, criterionText, selectedEvidence, onSelectEvidence, onClearTrace, verification }: {
   evidence: EvidenceItem[];
+  pending?: EvidenceItem[];
   trace: CriterionTrace | null;
   criterionText: string;
   selectedEvidence: string | null;
@@ -121,7 +122,8 @@ export function EvidenceExplorer({ evidence, trace, criterionText, selectedEvide
     if (selectedEvidence) refs.current.get(selectedEvidence)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedEvidence]);
 
-  const shown = trace && onlyRelated ? evidence.filter((e) => relatedIds.has(e.id)) : evidence;
+  const pendingIds = new Set(pending.map((e) => e.id));
+  const shown = [...(trace && onlyRelated ? evidence.filter((e) => relatedIds.has(e.id)) : evidence), ...pending];
 
   return (
     <div className="col" aria-label="Evidence explorer">
@@ -143,6 +145,7 @@ export function EvidenceExplorer({ evidence, trace, criterionText, selectedEvide
             <div className="card-head">
               <code className="grow" style={{ overflowWrap: "anywhere" }}>{e.path}:{e.startLine}-{e.endLine}</code>
               {e.symbol && <span className="badge neutral">{e.symbol}</span>}
+              {pendingIds.has(e.id) && <span className="badge k-assumed" title="Shown for review; not sent until you consent">not yet sent</span>}
               {invalid.has(e.id) && <span className="badge bad" title={invalid.get(e.id)}>invalid citation</span>}
               {e.injectionFlags.length > 0 && <span className="badge k-unresolved" title={e.injectionFlags.join(", ")}>Contains instruction-like text (treated as data)</span>}
             </div>

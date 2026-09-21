@@ -52,12 +52,13 @@ function QuestionCard({ q, value, onChange, detail, onSelectEvidence }: { q: Que
   );
 }
 
-export function TicketPanel({ detail, busy, onConsentAnalyze, onSubmitAnswers, onFollowUp, onSelectEvidence }: {
+export function TicketPanel({ detail, busy, onConsentAnalyze, onSubmitAnswers, onFollowUp, onDeclineFollowUp, onSelectEvidence }: {
   detail: SessionDetail;
   busy: boolean;
   onConsentAnalyze: () => void;
   onSubmitAnswers: (answers: { questionId: string; source: "user" | "suggestion_accepted" | "deferred"; answer: string }[]) => void;
   onFollowUp: () => void;
+  onDeclineFollowUp: () => void;
   onSelectEvidence: (id: string) => void;
 }) {
   const { session, disclosure, analysis, rounds, decisions } = detail;
@@ -104,7 +105,8 @@ export function TicketPanel({ detail, busy, onConsentAnalyze, onSubmitAnswers, o
 
       {session.status === "awaiting_consent" && disclosure && (
         <section className="card stack" aria-label="Disclosure and consent">
-          <h2>Review what will be sent to the model</h2>
+          <h2>{disclosure.scope === "followup" ? `Review the additional excerpts for round ${session.round}` : "Review what will be sent to the model"}</h2>
+          {disclosure.scope === "followup" && <p className="small muted" style={{ margin: 0 }}>Your answers point at code the first search did not include. Only these new excerpts are listed; the earlier ones were already approved.</p>}
           {disclosure.leavesMachine ? (
             <div className="banner">These excerpts and your ticket will be sent to <strong>{disclosure.providerLabel}</strong>. Nothing else from the repository is sent.</div>
           ) : (
@@ -124,7 +126,10 @@ export function TicketPanel({ detail, busy, onConsentAnalyze, onSubmitAnswers, o
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>I have reviewed these excerpts and agree to send them{disclosure.leavesMachine ? "" : " to the fixture provider"}.</span>
           </label>
-          <button className="btn primary" disabled={!consent || busy} onClick={onConsentAnalyze} type="button">Analyze repository behavior</button>
+          <div className="row">
+            <button className="btn primary" disabled={!consent || busy} onClick={onConsentAnalyze} type="button">{disclosure.scope === "followup" ? "Send these and ask follow-up questions" : "Analyze repository behavior"}</button>
+            {disclosure.scope === "followup" && <button className="btn" disabled={busy} onClick={onDeclineFollowUp} type="button">Skip the new excerpts</button>}
+          </div>
         </section>
       )}
 

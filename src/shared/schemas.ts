@@ -58,6 +58,8 @@ export type InspectionResult = z.infer<typeof InspectionResult>;
 /** What will be sent to the model, shown to the user before any model call. */
 export const Disclosure = z.object({
   snapshotId: z.string(),
+  /** "followup" lists only the NEW excerpts a later round wants to send; consent is required again. */
+  scope: z.enum(["initial", "followup"]).default("initial"),
   providerKind: z.enum(["anthropic", "fixture"]),
   providerLabel: z.string(),
   leavesMachine: z.boolean(),
@@ -394,6 +396,8 @@ export const SessionDetail = z.object({
   running: z.boolean(),
   inspection: InspectionResult.nullable(),
   evidence: z.array(EvidenceItem),
+  /** Follow-up excerpts awaiting consent; shown to the user but NOT yet part of the evidence set or any prompt. */
+  pendingEvidence: z.array(EvidenceItem).default([]),
   disclosure: Disclosure.nullable(),
   analysis: BehaviorAnalysis.nullable(),
   rounds: z.array(ClarificationRound),

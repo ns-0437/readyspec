@@ -28,6 +28,9 @@ export function stem(word: string): string {
   return w;
 }
 
+/** Stemmed, stopword-free terms of a text (what the retriever matches on). */
+export const queryTerms = (text: string): string[] => terms(text);
+
 const terms = (text: string): string[] => tokenize(text).filter((t) => !STOPWORDS.has(t)).map(stem);
 
 /**

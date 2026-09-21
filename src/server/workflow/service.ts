@@ -22,7 +22,7 @@ import { createSnapshot } from "@/server/repository/snapshot";
 import { allowedRoots, assertRepositoryAllowed, isInside, RepositoryAccessError, resolveRepositoryRoot } from "@/server/repository/safe-fs";
 import { redactSecrets } from "@/shared/redact";
 import { ConflictError, NotFoundError, RuleViolationError } from "./errors";
-import { buildDisclosure, investigate } from "./investigate";
+import { buildDisclosure, findNewEvidence, investigate } from "./investigate";
 import { runAnalyze, runBrief, runClarify, runJudge, type StageEnv } from "./stages";
 import { verifyBrief } from "./verify";
 
@@ -169,6 +169,7 @@ export class SessionService {
     const s = this.requireSession(id);
     if (s.status === "failed" || s.status === "cancelled") return this.resume(id); // re-runs only the stage that failed
     if (s.status !== "awaiting_consent") throw new ConflictError(`Cannot start analysis while session is ${s.status}`);
+    if ((this.store.getArtifact(id, "pending_evidence") ?? []).length > 0) return this.acceptFollowUpEvidence(id);
     this.startJob(id, "analyze", "analyzing", (env, setStage) => this.pipeline(id, env, "analyze", setStage));
   }
 
@@ -234,20 +235,73 @@ export class SessionService {
   }
 
   /** Request another clarification round from the review screen. Answers and evidence are preserved. */
-  startFollowUp(id: string): void {
+  startFollowUp(id: string): { needsConsent: boolean } {
     const s = this.requireSession(id);
     if (s.status !== "review") throw new ConflictError("Follow-up questions can be requested while reviewing a draft brief");
     if (s.round >= MAX_ROUNDS) throw new RuleViolationError(`At most ${MAX_ROUNDS} clarification rounds are allowed`);
-    const analysis = this.store.getArtifact(id, "analysis");
-    if (!analysis) throw new ConflictError("Analysis is missing");
+    if (!this.store.getArtifact(id, "analysis")) throw new ConflictError("Analysis is missing");
+    if (this.jobs.has(id)) throw new ConflictError("A job is already running for this session");
     const next = s.round + 1;
-    this.startJob(id, "clarify", "analyzing", async (env) => {
-      this.store.setRound(id, next); // only once the job has really started (startJob may refuse)
-      const evidence = this.store.getArtifact(id, "evidence") ?? [];
-      await this.clarifyRound(id, env, next, analysis, evidence);
-      const round = this.store.getArtifact(id, "clarification", next);
-      if (round && round.questions.length === 0) this.store.setStatus(id, "review");
-    });
+
+    // The human's answers may point at code the first retrieval never saw. New excerpts need new consent.
+    const snapshot = this.store.loadSnapshot(this.store.getSnapshotId(id)!);
+    const existing = this.store.getArtifact(id, "evidence") ?? [];
+    const answers = this.store.listDecisions(id).filter((d) => d.source !== "deferred").map((d) => d.answer).join("\n");
+    const fresh = snapshot ? findNewEvidence(snapshot, s.ticket, answers, existing) : [];
+    if (snapshot && fresh.length > 0) {
+      const provider = this.deps.providerFactory();
+      if (provider.info.label !== s.provider.label) throw new ConflictError(`Model provider changed since this session was created (${s.provider.label} -> ${provider.info.label}). Start a new session.`);
+      this.store.setRound(id, next);
+      this.store.putArtifact(id, "pending_evidence", fresh);
+      this.store.putArtifact(id, "disclosure", buildDisclosure(snapshot, fresh, s.ticket, provider, "followup"));
+      this.store.setStatus(id, "awaiting_consent");
+      this.store.log(id, "retrieve", "info", `Round ${next}: your answers point at ${fresh.length} excerpt(s) not yet seen (${[...new Set(fresh.map((e) => e.path))].join(", ")}). Waiting for consent before sending them.`);
+      return { needsConsent: true };
+    }
+    this.startJob(id, "clarify", "analyzing", (env) => this.followUpJob(id, env, next, false));
+    return { needsConsent: false };
+  }
+
+  /** Runs the next clarification round; when `merge`, first adds the consented new excerpts to the evidence set. */
+  private async followUpJob(id: string, env: StageEnv, round: number, merge: boolean): Promise<void> {
+    this.store.setRound(id, round); // only once the job has really started (startJob may refuse)
+    const analysis = this.store.getArtifact(id, "analysis");
+    if (!analysis) throw new StageError("Analysis is missing", false);
+    let evidence = this.store.getArtifact(id, "evidence") ?? [];
+    const pending = this.store.getArtifact(id, "pending_evidence") ?? [];
+    if (merge && pending.length) {
+      const known = new Set(evidence.map((e) => e.id));
+      evidence = [...evidence, ...pending.filter((e) => !known.has(e.id))];
+      this.store.putArtifact(id, "evidence", evidence);
+      this.store.log(id, "retrieve", "info", `Added ${pending.length} consented excerpt(s); evidence set is now ${evidence.length}.`);
+    }
+    this.clearPending(id, evidence);
+    await this.clarifyRound(id, env, round, analysis, evidence);
+    const r = this.store.getArtifact(id, "clarification", round);
+    if (r && r.questions.length === 0) this.store.setStatus(id, "review");
+  }
+
+  /** Drops pending excerpts and restores the disclosure to describe the whole evidence set. */
+  private clearPending(id: string, evidence: EvidenceItem[]): void {
+    this.store.deleteArtifact(id, "pending_evidence");
+    const snapshot = this.store.loadSnapshot(this.store.getSnapshotId(id)!);
+    if (snapshot) this.store.putArtifact(id, "disclosure", buildDisclosure(snapshot, evidence, this.requireSession(id).ticket, this.deps.providerFactory()));
+  }
+
+  /** Consent given for new follow-up excerpts. */
+  private acceptFollowUpEvidence(id: string): void {
+    const s = this.requireSession(id);
+    this.startJob(id, "clarify", "analyzing", (env) => this.followUpJob(id, env, s.round, true));
+  }
+
+  /** The user declines the new excerpts: continue the round with the evidence already consented to. */
+  declineFollowUpEvidence(id: string): void {
+    const s = this.requireSession(id);
+    if (s.status !== "awaiting_consent" || !(this.store.getArtifact(id, "pending_evidence") ?? []).length) {
+      throw new ConflictError("There are no pending excerpts to decline");
+    }
+    this.store.log(id, "retrieve", "info", "New excerpts declined; continuing with the evidence already sent.");
+    this.startJob(id, "clarify", "analyzing", (env) => this.followUpJob(id, env, s.round, false));
   }
 
   /* ------------------------------ brief ------------------------------ */
@@ -376,6 +430,7 @@ export class SessionService {
       running: this.jobs.has(id),
       inspection: this.store.getArtifact(id, "inspection"),
       evidence: this.store.getArtifact(id, "evidence") ?? [],
+      pendingEvidence: this.store.getArtifact(id, "pending_evidence") ?? [],
       disclosure: this.store.getArtifact(id, "disclosure"),
       analysis: this.store.getArtifact(id, "analysis"),
       rounds: this.store.listRounds(id),

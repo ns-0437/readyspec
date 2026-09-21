@@ -29,7 +29,8 @@ type ArtifactKind =
   | "analysis"
   | "clarification"
   | "brief"
-  | "verification";
+  | "verification"
+  | "pending_evidence";
 
 const ARTIFACT_SCHEMAS = {
   inspection: InspectionResult,
@@ -39,6 +40,7 @@ const ARTIFACT_SCHEMAS = {
   clarification: ClarificationRound,
   brief: Brief,
   verification: VerificationReport,
+  pending_evidence: z.array(EvidenceItem),
 } satisfies Record<ArtifactKind, z.ZodType>;
 
 type ArtifactType<K extends ArtifactKind> = z.infer<(typeof ARTIFACT_SCHEMAS)[K]>;

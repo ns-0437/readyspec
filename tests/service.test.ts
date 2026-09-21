@@ -131,7 +131,8 @@ describe("clarification rounds", () => {
     const { service } = makeService();
     const { id, detail } = await runToReview(service);
     const evBefore = detail.evidence.map((e) => e.id);
-    service.startFollowUp(id);
+    // These answers mention "job" and "end date", which pull in retry-queue and preference-default excerpts: decline them here.
+    if (service.startFollowUp(id).needsConsent) service.declineFollowUpEvidence(id);
     await service.waitForIdle(id);
     const d = service.getDetail(id)!;
     expect(d.session.round).toBe(2);
@@ -441,4 +442,88 @@ describe("data retention and stage-precise recovery", () => {
     await service.waitForIdle(id);
     expect(service.getDetail(id)!.session.round).toBe(2); // advanced exactly once
   });
+});
+
+describe("follow-up rounds that point at unseen code", () => {
+  /** Drive to review, answering one question with text that names code the first search never retrieved. */
+  async function reviewWithInvoiceAnswer(rec: RecordingProvider) {
+    const { service } = makeService(rec);
+    const s = service.createSession(DEMO_REPO, DEMO_TICKET);
+    service.startAnalysis(s.id);
+    await service.waitForIdle(s.id);
+    const qs = service.getDetail(s.id)!.rounds[0]!.questions;
+    service.submitAnswers(s.id, qs.map((q, i) =>
+      i === 1
+        ? { questionId: q.id, source: "user" as const, answer: "Send one summary with the invoice total (invoiceTotal) when the pause ends." }
+        : { questionId: q.id, source: "suggestion_accepted" as const, answer: q.suggestedAnswers[0]!.text }));
+    service.startBrief(s.id);
+    await service.waitForIdle(s.id);
+    return { service, id: s.id };
+  }
+
+  it("asks for consent again, lists only the new excerpts, and sends nothing before consent", async () => {
+    const rec = new RecordingProvider();
+    const { service, id } = await reviewWithInvoiceAnswer(rec);
+    const before = service.getDetail(id)!;
+    expect(before.evidence.some((e) => e.path === "src/billing/invoice.ts")).toBe(false);
+    const callsBefore = rec.requests.length;
+
+    expect(service.startFollowUp(id)).toEqual({ needsConsent: true });
+    const d = service.getDetail(id)!;
+    expect(d.session.status).toBe("awaiting_consent");
+    expect(d.session.round).toBe(2);
+    expect(d.disclosure!.scope).toBe("followup");
+    expect(d.disclosure!.sentPaths).toContain("src/billing/invoice.ts");
+    expect(d.disclosure!.items.every((i) => !before.evidence.some((e) => e.id === i.evidenceId))).toBe(true); // only NEW excerpts
+    expect(d.pendingEvidence.map((e) => e.path)).toContain("src/billing/invoice.ts");
+    expect(d.evidence.map((e) => e.id)).toEqual(before.evidence.map((e) => e.id)); // evidence set unchanged until consent
+    expect(rec.requests.length).toBe(callsBefore); // nothing sent
+  });
+
+  it("consent merges the excerpts, keeps ids and decisions stable, and runs the round", async () => {
+    const rec = new RecordingProvider();
+    const { service, id } = await reviewWithInvoiceAnswer(rec);
+    const before = service.getDetail(id)!;
+    service.startFollowUp(id);
+    service.startAnalysis(id); // consent
+    await service.waitForIdle(id);
+    const d = service.getDetail(id)!;
+    expect(d.evidence.map((e) => e.id).slice(0, before.evidence.length)).toEqual(before.evidence.map((e) => e.id));
+    expect(d.evidence.some((e) => e.path === "src/billing/invoice.ts")).toBe(true);
+    expect(d.pendingEvidence).toEqual([]);
+    expect(d.disclosure!.scope).toBe("initial"); // describes the whole evidence set again
+    expect(d.decisions).toEqual(before.decisions);
+    expect(d.session.status).toBe("review"); // fixture asks nothing further
+    const clarify = rec.requests.filter((r) => r.stage === "clarify").pop()!;
+    expect(clarify.user).toContain("src/billing/invoice.ts"); // only sent after consent
+  });
+
+  it("declining continues the round without the new excerpts", async () => {
+    const rec = new RecordingProvider();
+    const { service, id } = await reviewWithInvoiceAnswer(rec);
+    const before = service.getDetail(id)!;
+    service.startFollowUp(id);
+    service.declineFollowUpEvidence(id);
+    await service.waitForIdle(id);
+    const d = service.getDetail(id)!;
+    expect(d.evidence.map((e) => e.id)).toEqual(before.evidence.map((e) => e.id));
+    expect(d.pendingEvidence).toEqual([]);
+    expect(rec.requests.every((r) => !r.user.includes("src/billing/invoice.ts"))).toBe(true);
+    expect(() => service.declineFollowUpEvidence(id)).toThrow(/no pending/);
+  });
+
+  it("goes straight to the round when the answers introduce nothing new (here: every question deferred)", async () => {
+    const { service } = makeService();
+    const s = service.createSession(DEMO_REPO, DEMO_TICKET);
+    service.startAnalysis(s.id);
+    await service.waitForIdle(s.id);
+    const qs = service.getDetail(s.id)!.rounds[0]!.questions;
+    service.submitAnswers(s.id, qs.map((q) => ({ questionId: q.id, source: "deferred" as const, answer: "" })));
+    service.startBrief(s.id);
+    await service.waitForIdle(s.id);
+    expect(service.startFollowUp(s.id)).toEqual({ needsConsent: false });
+    await service.waitForIdle(s.id);
+    expect(service.getDetail(s.id)!.session.round).toBe(2);
+  });
+
 });

@@ -28,21 +28,19 @@ Likely suspects, in the order I would check them:
 
 ## 3. Retrieval quality (no key needed, but mind the held-out set)
 
-Current numbers: recall 96% dev / 100% held-out, precision about 56%; one dev miss is a vocabulary gap.
+Current numbers: recall 96% dev / 100% clean held-out v2, precision 57% dev / 48% v2; one dev miss is a vocabulary gap. A dev-only sweep of cheap knobs moved precision about a point (decisions.md 13), so further gains likely need model re-ranking.
 
-- Precision: down-weight README and generic docs unless several distinct ticket terms match;
+- Precision: README down-weight is done (0.5, tiny gain);
   pair each source file with its test; cap distractor-prone hops.
 - Vocabulary gap: optional model query expansion as an explicit, disclosed extra call (a clarifying
   step, not a silent one). Embeddings only if this still leaves a gap.
-- **Caveat:** the held-out cases were run once. Any further retrieval tuning contaminates them.
-  Author 10-20 new held-out cases *before* tuning, and say so in the report.
+- **Caveat:** held-out v1 is contaminated and v2 has been run once. Any further tuning contaminates v2;
+  author a v3 cohort *before* tuning, and say so in the report.
 
-## 4. Follow-up rounds that can look at new code
+## 4. Follow-up rounds that can look at new code — done
 
-Rounds 2 and 3 reuse the original excerpts, so an answer that points at unseen code cannot pull it
-in. Re-retrieve with the ticket plus the answers, show only the *new* excerpts, and require a second
-consent. Touches `service.ts` (new `awaiting_consent` path for follow-ups), the disclosure schema and
-`TicketPanel`.
+Implemented (decisions.md 10): answers that introduce new terms can pull in new excerpts, shown as "not yet sent"
+and sent only after a second consent. Still to tune with a live model: whether the two-term threshold is right.
 
 ## 5. A benchmark that can actually separate the systems
 

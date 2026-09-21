@@ -7,7 +7,7 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 141 tests, production build, and the UI driven
+Milestones 1-5 built and checked: lint, typecheck, 146 tests, production build, and the UI driven
 end to end in a browser. **Two things are NOT done:** (1) the live-model path has never run
 against the real API (no credentials were available; the Anthropic adapter is tested only against
 a local mock server), and (2) no model-dependent benchmark result exists. Everything that runs
@@ -115,7 +115,7 @@ allowed), `READYSPEC_DB`, `READYSPEC_MAX_CALLS|MAX_INPUT_TOKENS|MAX_OUTPUT_TOKEN
 
 - Live model never exercised against the real API (see Status).
 - Retrieval is lexical + symbol-aware; symbol extraction is regex-based (TS/JS/Py/Md), not a parser.
-- Follow-up rounds reuse the original evidence (no re-retrieval, so no new consent needed).
+- Follow-up rounds re-retrieve from ticket + answers; new excerpts (>=2 answer-introduced terms) need a second consent.
 - Retrieval precision is about 56% (recall 96% dev / 100% held-out, small samples); one dev miss is a vocabulary gap.
 - Snapshots keep file contents in the local SQLite file; deleting a session removes unshared snapshots.
 - Snapshot creation is synchronous and capped (1500 files / 12 MB / 200 KB per file).

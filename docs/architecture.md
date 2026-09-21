@@ -83,6 +83,7 @@ evidence, unlinked step, uncovered criterion, unrecorded decision reference.
 created -> inspecting -> awaiting_consent -> analyzing -> awaiting_answers -> briefing -> review -> approved
                                    \___________ failed / cancelled (recoverable: resume) ___________/
 review --follow-up--> analyzing --> awaiting_answers (round n+1) | review (no new questions)
+review --follow-up naming unseen code--> awaiting_consent (new excerpts only) --consent or skip--> analyzing
 approved --edit--> review (approval cleared)
 ```
 

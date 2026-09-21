@@ -27,7 +27,7 @@ about existing behavior points at code; every proposed change connects to a requ
 | Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **The live model path has never run against the real API** (no key at build time). The Anthropic adapter is tested only against a local mock server. |
 | Read-only snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists.** The harness, 26 cases and human rubric are ready; single-prompt vs staged is unmeasured. |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 141 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
+| 146 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
 | Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
@@ -197,9 +197,8 @@ CI runs lint, typecheck, tests, fixture tests, the deterministic benchmark and t
 
 1. Validate the live path and finish the benchmark ([docs/live-validation.md](docs/live-validation.md)).
 2. Fix what that exposes; improve retrieval precision and the vocabulary gap.
-3. Follow-up rounds that can retrieve new code (with a second consent).
-4. A benchmark on repositories larger than the context budget.
-5. Polish: revision diffs, inline line highlighting, screenshots and a recording.
+3. A benchmark on repositories larger than the context budget.
+4. Polish: revision diffs, inline line highlighting, screenshots and a recording.
 
 Details and reasoning: [docs/roadmap.md](docs/roadmap.md). Decisions and measured trade-offs:
 [docs/decisions.md](docs/decisions.md).
@@ -207,7 +206,6 @@ Details and reasoning: [docs/roadmap.md](docs/roadmap.md). Decisions and measure
 ## Limitations
 
 Single-user local tool (no authentication); one job per session, in-process; snapshot creation is
-synchronous and capped at 1500 files / 12 MB; symbol extraction is regex-based; follow-up rounds reuse
-the original excerpts; the `node:sqlite` module prints an experimental warning. Snapshots store the
+synchronous and capped at 1500 files / 12 MB; symbol extraction is regex-based; the `node:sqlite` module prints an experimental warning. Snapshots store the
 contents of every readable file in the local SQLite file (`data/`, git-ignored); deleting a session
 removes them unless another session pins the same snapshot.

@@ -62,9 +62,12 @@ scripted for the demonstration ticket and mechanical elsewhere. It is labelled i
 provenance, exports and reports, and evaluation metrics that depend on model output are reported
 as n/a rather than computed from scripted text.
 
-## 10. Follow-up rounds reuse the original evidence
-No re-retrieval in rounds 2-3, so no new consent is needed and evidence ids stay stable. Cost: a
-new answer that points at unseen code cannot pull it in. Revisit with a second consent step.
+## 10. Follow-up rounds can pull in new code, but only with new consent
+First version reused the original excerpts. Now a follow-up re-runs retrieval over the ticket plus the human's answers and keeps only excerpts that (a) are not already known and (b) match at least two words the answers introduced
+(so loosely related chunks do not force a consent step every round). If any remain, the session returns to
+`awaiting_consent` with a disclosure that lists only the new excerpts (`scope: followup`); they are shown in the explorer
+as "not yet sent" and no model call happens until the user accepts or skips them. Evidence ids stay stable and the
+disclosure is rebuilt for the whole set afterwards. Cost: one extra click when answers name new code.
 
 ## 11. UI was built after the backend, against the real API
 The plan called for a fixture-data interface in milestone 1. It was faster and less wasteful to

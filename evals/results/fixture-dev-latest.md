@@ -2,12 +2,12 @@
 
 > **Fixture provider run.** No language model produced any output here. Metrics that depend on model output are marked n/a. The static-checklist column and the staged workflow's retrieval columns are real (deterministic). Do not read this as a model-quality result.
 
-Cases: 13 (0 held out). Generated 2026-09-21T04:44:33.806Z.
+Cases: 13 (0 held out). Generated 2026-09-21T15:05:27.252Z.
 
 | Metric | Static checklist | Single prompt | ReadySpec staged |
 |---|---|---|---|
 | Required-file recall (retrieval) | 0% | n/a (fixture) | 96% |
-| Precision of files used | n/a | n/a (fixture) | 56% |
+| Precision of files used | n/a | n/a (fixture) | 57% |
 | Distractor files used / case | 0.00 | n/a (fixture) | 0.54 |
 | Citation validity | n/a | n/a (fixture) | n/a (fixture) |
 | Observed claims supported by cited code | n/a | n/a (fixture) | n/a (fixture) |

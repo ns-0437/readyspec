@@ -25,9 +25,9 @@ about existing behavior points at code; every proposed change connects to a requ
 | Works and is tested | Not done / not validated |
 |---|---|
 | Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **The live model path has never run against the real API** (no key at build time). The Anthropic adapter is tested only against a local mock server. |
-| Read-only snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists.** The harness, 20 cases and human rubric are ready; single-prompt vs staged is unmeasured. |
+| Read-only snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists.** The harness, 26 cases and human rubric are ready; single-prompt vs staged is unmeasured. |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 141 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is about 56% |
+| 141 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
 | Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
@@ -143,13 +143,13 @@ Copy `.env.example` to `.env.local`. All optional.
 
 ## Evaluation
 
-Twenty hand-authored tickets over three small fictional repositories (TypeScript and Python), seven
-held out, compared across a static checklist, a single prompt and the staged workflow.
+Twenty-six hand-authored tickets over three small fictional repositories (TypeScript and Python), thirteen
+held out in two cohorts, compared across a static checklist, a single prompt and the staged workflow.
 
-| What was actually measured (deterministic) | Development (13) | Held out (7) |
+| What was actually measured (deterministic) | Development (13) | Held-out v2 (6, clean) |
 |---|---|---|
 | Staged retrieval: required-file recall | 96% | 100% |
-| Staged retrieval: precision | 56% | 58% |
+| Staged retrieval: precision | 57% | 48% |
 | Static checklist: critical ambiguities asked | 3% | 0% |
 
 The model-dependent comparison (evidence correctness, ambiguity detection, unnecessary questions,

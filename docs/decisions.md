@@ -72,8 +72,15 @@ build the backend first and drive the real interface with the fixture provider, 
 what the demo uses. There is no separate mock UI.
 
 ## 12. Evaluation design
-Twenty hand-authored cases over three small repositories; seven are held out (run once, after
+Twenty-six hand-authored cases over three small repositories; thirteen are held out in two cohorts (see 13; run once, after
 code freeze). Ambiguity/assumption/contradiction scoring uses keyword groups: deterministic and
 auditable but crude. Calibration tests check the groups are not trivially satisfied (the generic
 checklist scores about 3%) and are satisfiable (natural specific questions score >= 80%). The
 human rubric is authoritative. See `docs/evaluation.md`.
+
+## 13. Retrieval tuning stopped at cheap knobs; held-out cohorts
+After the first held-out run, six new held-out cases (cohort v2) were written *before* touching retrieval, so v1 is
+declared contaminated and v2 is the clean estimate. A dev-only sweep (README down-weight, per-file cap, minimum items,
+hop cap) moved precision by about one point; only the README down-weight (0.5) was kept. Disabling the reference and
+definition hops raised dev precision to 62% but cut recall from 96% to 87%, so they stay. Clean v2 result: recall 100%,
+precision 48% (dev 57%), i.e. the dev number was optimistic. Further gains likely need model re-ranking, which needs a key.

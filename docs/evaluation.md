@@ -14,10 +14,10 @@ to market.
 
 ## Cases
 
-`evals/cases/*.json`: 20 tickets over three small fictional repositories written for this
+`evals/cases/*.json`: 26 tickets over three small fictional repositories written for this
 project (`fixtures/demo-repository` TypeScript, `fixtures/repos/shop-orders` TypeScript,
-`fixtures/repos/team-tasks` Python). Kinds: clear (2), ambiguous (10), conflicting documentation
-(4), irrelevant files (1), misleading premise (1), vague (1), insufficient evidence (1) — plus
+`fixtures/repos/team-tasks` Python). Kinds: clear (2), ambiguous (14), conflicting documentation
+(5), irrelevant files (1), misleading premise (1), vague (1), insufficient evidence (2) — plus
 planted prompt-injection documents in every repository, some of which are retrieved.
 
 Each case was written before any system output was inspected and records: expected required and
@@ -26,8 +26,9 @@ topics, expected contradictions, unacceptable silent assumptions, and whether th
 "the evidence is insufficient". `tests/eval.test.ts` checks that every referenced file exists and
 that the keyword groups are neither trivially satisfied nor unsatisfiable.
 
-Seven cases are held out. Development cases were used to tune retrieval (one change, recorded in
-`docs/decisions.md`). Held-out cases were run once, after the retrieval code was frozen.
+Thirteen cases are held out in two cohorts. **v1** (7) was run once, then retrieval was tuned on the development
+cases, so v1 is contaminated. **v2** (6) was written before that tuning and run once after it (`--set heldout-v2`);
+it is the only clean held-out estimate. Any further tuning requires a new cohort first.
 
 ## Systems compared (same snapshot, same retrieval budget)
 
@@ -66,7 +67,7 @@ npm run eval -- --provider anthropic --set dev      # needs ANTHROPIC_API_KEY
 npm run eval -- --provider anthropic --set heldout  # once, after freezing the code
 ```
 
-Options: `--systems checklist,single,staged`, `--cases id,id`, `--set dev|heldout|all`.
+Options: `--systems checklist,single,staged`, `--cases id,id`, `--set dev|heldout|heldout-v2|all`.
 Outputs: `evals/results/<provider>-<set>-latest.md` (table), a timestamped JSON with every raw
 output and score, and, for live runs, `human-scoring-sheet-<set>.csv` to fill in.
 
@@ -77,7 +78,7 @@ scored as if it were model output.
 
 - Cases, fixtures, systems and scoring keywords were all written by the same person. Held-out
   cases guard against tuning, not against shared blind spots.
-- Twenty cases on three tiny repositories say little about real codebases, and nothing about scale.
+- Twenty-six cases on three tiny repositories say little about real codebases, and nothing about scale.
 - Keyword scoring both under- and over-credits paraphrase; report it as an approximation.
 - On small repositories a single prompt sees everything, so retrieval cannot differentiate the systems.
   A fair test of retrieval needs repositories larger than the context budget.

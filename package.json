@@ -1,0 +1,38 @@
+{
+  "name": "readyspec",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Repository-aware agent that turns rough engineering tickets into evidence-backed implementation briefs.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit && tsc -p fixtures/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:fixtures": "node --test \"fixtures/demo-repository/tests/*.test.ts\" \"fixtures/repos/shop-orders/tests/*.test.ts\"",
+    "eval": "tsx evals/runners/run.ts",
+    "check": "npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}

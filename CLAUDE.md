@@ -7,7 +7,7 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 139 tests, production build, and the UI driven
+Milestones 1-5 built and checked: lint, typecheck, 141 tests, production build, and the UI driven
 end to end in a browser. **Two things are NOT done:** (1) the live-model path has never run
 against the real API (no credentials were available; the Anthropic adapter is tested only against
 a local mock server), and (2) no model-dependent benchmark result exists. Everything that runs
@@ -85,10 +85,11 @@ long files; prefer the Write/Edit tools for source with regexes.
 - `src/components/` — `Home`, `Workspace`, `TicketPanel`, `EvidenceExplorer` (+ traceability inspector), `BriefPanel`, `ActivityLog`, `Badges`, `api`.
 - `fixtures/demo-repository/` — labelled DEMO TypeScript app (auth, notifications, preferences, tests) with planted secret, binary, generated file, conflicting docs and a prompt-injection doc. Has its own passing tests.
 - `fixtures/repos/{shop-orders,team-tasks}/` — labelled evaluation repos (TypeScript, Python); shop-orders has runnable tests.
-- `evals/` — `cases/*.json` (20 hand-authored, 7 held out), `runners/` (schema, score, systems, run, cases), `rubrics/human-rubric.md`, `results/`, `REPORT.md`.
+- `evals/` — `cases/*.json` (20 hand-authored, 7 held out), `runners/` (schema, score, systems, report, run, cases), `rubrics/human-rubric.md`, `results/`, `REPORT.md`.
 - `tests/` — Vitest suites (repository safety, search/evidence, LLM layer + mock Anthropic server, verifier, service, API, edit/trace/export, eval scoring/case integrity).
+- `scripts/live-smoke.ts` — live-path smoke test; `.github/workflows/ci.yml` — lint, typecheck, tests, fixture tests, deterministic eval, build.
 - `.env.example` — every supported env var, commented out.
-- `docs/` — product, architecture, decisions, evaluation, demo (90-second script), plan.
+- `docs/` — product, architecture, decisions, evaluation, demo (90-second script), live-validation, roadmap, plan.
 
 ## Commands (all verified)
 
@@ -101,7 +102,8 @@ npm test               # vitest
 npm run test:fixtures  # node --test on the demo + shop-orders fixtures' own tests
 npm run check          # lint + typecheck + test
 npm run build          # production build
-npm run eval -- --provider fixture --set dev   # benchmark; --set heldout ONCE after code freeze
+npm run eval -- --provider fixture --set dev   # benchmark; --repeat N for variance; --set heldout ONCE after code freeze
+npm run smoke:live     # first-contact live check (needs ANTHROPIC_API_KEY); see docs/live-validation.md
 ```
 
 Config (env): `ANTHROPIC_API_KEY`, `READYSPEC_PROVIDER=fixture|anthropic`, `READYSPEC_MODEL`
@@ -121,11 +123,9 @@ allowed), `READYSPEC_DB`, `READYSPEC_MAX_CALLS|MAX_INPUT_TOKENS|MAX_OUTPUT_TOKEN
 
 ## Next actions
 
-1. Run `npm run eval -- --provider anthropic --set dev` with a real key (see docs/evaluation.md);
-   validate the live path in the UI; fix what it exposes.
-2. Human-score outputs with evals/rubrics/human-rubric.md; then run `--set heldout` once.
-3. Update evals/REPORT.md and the README status table with real numbers, failures included.
-4. Record the 90-second demo (docs/demo.md).
+See docs/roadmap.md (ordered). Top item: run docs/live-validation.md with a real key. Repo is public at
+https://github.com/ns-0437/readyspec (branch main; CI on push). Retrieval changes after the held-out run
+contaminate it: write new held-out cases first.
 
 ## Maintenance rule
 

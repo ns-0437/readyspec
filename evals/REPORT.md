@@ -51,7 +51,7 @@ it exists.
 
 ## Other evidence that the system does what it claims (tests, not benchmark)
 
-These are engineering tests (139 in `tests/`), not model-quality evidence:
+These are engineering tests (141 in `tests/`), not model-quality evidence:
 
 - Snapshots exclude secrets, binaries, generated and oversized files, never follow symlinks or
   junctions, and pin content by hash. Traversal and out-of-root paths are rejected.

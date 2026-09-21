@@ -1,134 +1,213 @@
 # ReadySpec
 
-A repository-aware agent that turns a rough engineering ticket into an **evidence-backed
-implementation brief**. It reads the actual code, finds the decisions the ticket leaves open,
-asks a few useful questions, and produces a plan an engineer can review and implement, where
-every statement about existing behavior points at code and every proposed change connects to a
-requirement and a test.
+[![CI](https://github.com/ns-0437/readyspec/actions/workflows/ci.yml/badge.svg)](https://github.com/ns-0437/readyspec/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 
-> **Demonstration data.** The bundled repositories under `fixtures/` are fictional code written
-> for this project. They are not BetterMe's code or system.
+**A repository-aware agent that turns a rough engineering ticket into an evidence-backed
+implementation brief.** It reads the actual code, finds the decisions the ticket leaves open, asks
+a few useful questions, and produces a plan an engineer can review and implement. Every statement
+about existing behavior points at code; every proposed change connects to a requirement and a test.
 
-## Honest status
+> *"I built a repository-aware agent that helps engineers resolve ambiguity before implementation,
+> with code-backed evidence and a benchmark against simpler approaches."*
+
+> **Demonstration data.** The repositories under `fixtures/` are fictional code written for this
+> project. They are not BetterMe's code or system.
+
+**Contents:** [Status](#status) · [The problem](#the-problem) · [How it works](#how-it-works) ·
+[Quick start](#quick-start) · [Configuration](#configuration) · [Safety model](#safety-model) ·
+[Evaluation](#evaluation) · [Project layout](#project-layout) · [Development](#development) ·
+[Roadmap](#roadmap) · [Limitations](#limitations)
+
+## Status
 
 | Works and is tested | Not done / not validated |
 |---|---|
-| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **Live model path has not been run against the real API** (no credentials were available). The Anthropic adapter is tested only against a local mock server. |
-| Safe read-only repository snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists yet.** The harness, 20 cases and human rubric are ready; the single-prompt vs staged comparison is unmeasured. |
-| Deterministic verifier (citations, support, traceability, decisions) | Support check is lexical, not semantic |
-| 139 tests, lint, typecheck, production build | Retrieval is lexical; precision is about 56% (see the report) |
-| Deterministic retrieval + static-checklist benchmark results | |
+| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **The live model path has never run against the real API** (no key at build time). The Anthropic adapter is tested only against a local mock server. |
+| Read-only snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists.** The harness, 20 cases and human rubric are ready; single-prompt vs staged is unmeasured. |
+| Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
+| 141 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is about 56% |
+| Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
 
-Everything you can run today without a key uses the **fixture provider**: scripted output for the
-demonstration ticket and a mechanical fallback elsewhere. It is labelled in the UI, in the
-brief, in exports and in evaluation reports. It is not a language model.
+Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
+mechanical elsewhere. It is labelled in the UI, in the brief, in exports and in evaluation reports.
+It is not a language model. Next steps: [docs/roadmap.md](docs/roadmap.md).
+
+## The problem
+
+A ticket describes the outcome someone wants. It rarely says how the code behaves today, which
+components are involved, which product decisions are still open, or how the change will be tested.
+The engineer rediscovers all of that, then guesses at the gaps or interrupts someone.
+
+ReadySpec produces, for a given ticket and repository:
+
+- the requested outcome, scope and explicit non-goals
+- **existing behavior**, each statement tied to file and line evidence
+- the decisions a human made, and the questions still open
+- proposed acceptance criteria, each linked to evidence, affected components and a test
+- an implementation sequence, test plan, risks and explicit assumptions
+
+Content is always one of four kinds, in the schema, the verifier, the UI and the exports:
+
+| Kind | Meaning | Rule |
+|---|---|---|
+| **Observed** | What the code does today | Must cite evidence; verified against the pinned snapshot |
+| **Proposed** | A change, criterion, step or test | Never phrased as existing behavior |
+| **Assumed** | An explicit, temporary assumption | Says what would replace it |
+| **Unresolved** | A decision that needs a human | Never chosen silently; stays visible |
+
+## How it works
+
+```mermaid
+flowchart TD
+  A[Select repository + ticket] --> B[1 Inspect: read-only snapshot]
+  B --> C[2 Retrieve: BM25 + symbol hops -> bounded excerpts]
+  C --> D{Disclosure: exactly what would be sent. Consent?}
+  D -->|yes| E[3 Analyze behavior: observations, contradictions, open decisions]
+  E --> F[4 Clarify: at most 5 ranked questions per round]
+  F --> G[Human answers, suggests, or defers]
+  G --> H[5 Brief: criteria, components, steps, tests, risks]
+  H --> I[6 Verify: citations, support, traceability, decisions]
+  I --> J[Human review: edit, re-verify, approve, export]
+  G -.->|optional follow-up round| F
+```
+
+Stages 1, 2 and 6 are plain code; only 3, 4 and 5 (and an optional support judge) call a model. Data
+between stages is Zod-validated. Full design: [docs/architecture.md](docs/architecture.md).
+
+**The signature interaction:** select an acceptance criterion and the evidence explorer shows,
+together, the code excerpts it builds on (the rest dim), the affected components, its proposed
+tests, the steps that deliver it, the decisions it relies on and any open question blocking it.
 
 ## Quick start
 
-Requires Node 22.13 or newer (uses the built-in `node:sqlite`).
+Requires Node 22.13+ (it uses the built-in `node:sqlite`).
 
 ```bash
+git clone https://github.com/ns-0437/readyspec.git
+cd readyspec
 npm install
 npm run dev
 ```
 
 Open http://localhost:3000. The demonstration repository and ticket ("Let users pause
 notifications while they are away.") are pre-filled. Click **Investigate repository**, review the
-disclosure, consent, answer the questions, and open the brief. Click an acceptance criterion to
-see its evidence, affected components and proposed tests together. A walkthrough for a 90-second
-recording is in [docs/demo.md](docs/demo.md).
+disclosure and consent, answer the questions, then open the brief and click an acceptance criterion.
+A 90-second walkthrough is in [docs/demo.md](docs/demo.md).
 
 ### Use a real model
 
 ```bash
-# PowerShell:  $env:ANTHROPIC_API_KEY = "..."
-export ANTHROPIC_API_KEY=...        # server-side only; never sent to the browser
-export READYSPEC_MODEL=claude-sonnet-5   # optional; this is the default
+export ANTHROPIC_API_KEY=...             # PowerShell: $env:ANTHROPIC_API_KEY = "..."
+npm run smoke:live                       # first-contact check; see docs/live-validation.md
 npm run dev
 ```
 
-Optional limits and pricing (no prices are hard-coded, so cost shows as unknown until you set them):
+The key stays server-side. When a real model is used, the excerpts listed on the consent screen
+(and your ticket) are sent to Anthropic; nothing else from the repository is.
+
+### Analyse your own repository
+
+Add its parent directory to `READYSPEC_ALLOWED_ROOTS`. ReadySpec only reads it: it never executes
+code, installs dependencies or writes to the repository.
+
+## Configuration
+
+Copy `.env.example` to `.env.local`. All optional.
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `ANTHROPIC_API_KEY` | unset | Enables the live provider |
 | `READYSPEC_PROVIDER` | `anthropic` if a key is set, else `fixture` | Force a provider |
+| `READYSPEC_MODEL` | `claude-sonnet-5` | Model id |
 | `READYSPEC_MAX_CALLS` | 14 | Model calls per session (retries count) |
-| `READYSPEC_MAX_INPUT_TOKENS` / `MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |
+| `READYSPEC_MAX_INPUT_TOKENS` / `READYSPEC_MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |
 | `READYSPEC_MAX_COST_USD` | unset | Cost ceiling (needs prices) |
-| `READYSPEC_PRICE_IN_PER_MTOK` / `PRICE_OUT_PER_MTOK` | unset | USD per million tokens |
+| `READYSPEC_PRICE_IN_PER_MTOK` / `READYSPEC_PRICE_OUT_PER_MTOK` | unset | USD per million tokens. Nothing is hard-coded, so cost shows as unknown until you set them |
 | `READYSPEC_ALLOWED_ROOTS` | fixtures only | Extra repository roots (path-delimited) |
 | `READYSPEC_DB` | `data/readyspec.db` | SQLite file |
 
-To analyse your own repository, add its parent directory to `READYSPEC_ALLOWED_ROOTS`. ReadySpec
-only reads it. If you run it against a real model, the excerpts listed on the consent screen are
-sent to Anthropic; nothing else from the repository is.
+## Safety model
 
-## What it does
+- **Untrusted input.** Repository text and tickets are fenced as data in prompts, instruction-like
+  text is flagged in the UI, and the model has no tools, so text cannot trigger an action.
+- **Confined reads.** Allowed roots only; symlinks and junctions are never followed; secrets, binaries,
+  generated, minified and oversized files are excluded; secret-bearing content is discarded.
+- **Consent.** No model call happens before you have seen the exact excerpts and agreed.
+- **Bounded.** Per-session ceilings on calls, tokens and cost; bounded retries; every call cancellable;
+  failures keep evidence and answers and can resume.
+- **Secrets.** Credentials stay server-side and are redacted from logs and errors.
+- **Human in charge.** Recorded answers override the model; approval needs a named reviewer, passing
+  verification for the current revision, and acknowledgement of any open questions.
 
-1. **Inspect** the repository into a read-only, content-addressed snapshot (symlinks never
-   followed; secrets, binaries, generated and oversized files excluded).
-2. **Retrieve** relevant code with lexical, symbol-aware search into bounded excerpts.
-3. **Disclose** exactly what would be sent to a model and wait for consent.
-4. **Analyze** current behavior (with citations), contradictions and open decisions.
-5. **Ask** at most five ranked questions per round, with suggested answers that are only options.
-6. **Brief**: requirements, existing behavior, decisions, open questions, criteria, components,
-   steps, tests, risks and assumptions, linked together.
-7. **Verify** deterministically, then a human reviews, edits, approves and exports.
+## Evaluation
 
-Content is always labelled **observed** (evidence-backed), **proposed**, **assumed** or
-**unresolved**. Design details: [docs/architecture.md](docs/architecture.md). Product intent:
-[docs/product.md](docs/product.md). Decisions and measured trade-offs:
-[docs/decisions.md](docs/decisions.md).
+Twenty hand-authored tickets over three small fictional repositories (TypeScript and Python), seven
+held out, compared across a static checklist, a single prompt and the staged workflow.
 
-## Reliability and safety
+| What was actually measured (deterministic) | Development (13) | Held out (7) |
+|---|---|---|
+| Staged retrieval: required-file recall | 96% | 100% |
+| Staged retrieval: precision | 56% | 58% |
+| Static checklist: critical ambiguities asked | 3% | 0% |
 
-Repository text and tickets are treated as untrusted data (fenced in prompts, injection heuristics
-flag them, the model has no tools). Nothing from a repository is executed or installed. Reads are
-confined to allowed roots. Credentials stay server-side and are redacted from logs and errors.
-Every call is bounded (calls, tokens, cost, retries) and cancellable; failed or cancelled sessions
-keep their evidence and answers and can resume. Approval is a human action and requires passing
-verification.
+The model-dependent comparison (evidence correctness, ambiguity detection, unnecessary questions,
+human correction effort, latency, cost) **has not been measured**, so no claim that ReadySpec beats a
+single prompt is made. Read [evals/REPORT.md](evals/REPORT.md) for the failures, and
+[docs/evaluation.md](docs/evaluation.md) for method and threats to validity. Human rubric:
+[evals/rubrics/human-rubric.md](evals/rubrics/human-rubric.md).
 
-## Commands
+## Project layout
+
+```
+src/shared        Zod schemas and pure helpers (trace, edit ops, redaction)
+src/server/
+  repository      snapshot, safe file access, symbols, search, evidence
+  llm             provider adapters, prompts, budgets, structured generation
+  workflow        stages, verifier, session service, export
+  persistence     SQLite store
+src/app/api       thin route handlers
+src/components    UI
+fixtures/         demo-repository and two evaluation repositories (fictional)
+evals/            cases, rubric, runner, results, report
+scripts/          live-smoke.ts
+tests/            Vitest suites
+docs/             product, architecture, decisions, evaluation, live-validation, roadmap, demo, plan
+CLAUDE.md         guide for future coding sessions
+```
+
+## Development
 
 ```bash
 npm run dev            # development server
 npm run build          # production build
 npm run lint           # eslint
 npm run typecheck      # tsc (app and fixtures)
-npm test               # 139 vitest tests
+npm test               # Vitest
 npm run test:fixtures  # the fixture repositories' own tests (node --test)
 npm run check          # lint + typecheck + test
-npm run eval -- --provider fixture --set dev   # benchmark (see below)
+npm run eval -- --provider fixture --set dev            # benchmark; add --repeat N for variance
+npm run smoke:live                                      # needs ANTHROPIC_API_KEY
 ```
 
-## Evaluation
+CI runs lint, typecheck, tests, fixture tests, the deterministic benchmark and the build on every push.
 
-Twenty hand-authored tickets over three small fixture repositories (TypeScript and Python), seven
-held out, compared across a static checklist, a single prompt and the staged workflow.
-[evals/REPORT.md](evals/REPORT.md) is candid about what exists: retrieval and checklist results
-are real; the model-dependent comparison needs a live run and is not yet measured. Method and
-threats to validity: [docs/evaluation.md](docs/evaluation.md). Human rubric:
-[evals/rubrics/human-rubric.md](evals/rubrics/human-rubric.md).
+## Roadmap
 
-## Repository layout
+1. Validate the live path and finish the benchmark ([docs/live-validation.md](docs/live-validation.md)).
+2. Fix what that exposes; improve retrieval precision and the vocabulary gap.
+3. Follow-up rounds that can retrieve new code (with a second consent).
+4. A benchmark on repositories larger than the context budget.
+5. Polish: revision diffs, inline line highlighting, screenshots and a recording.
 
-```
-src/shared        schemas and pure helpers
-src/server/       repository (snapshot, search, evidence), llm, workflow, persistence
-src/app/api       thin route handlers
-src/components    UI
-fixtures/         demo-repository and evaluation repositories (fictional)
-evals/            cases, rubric, runner, results, report
-tests/            vitest suites
-docs/             product, architecture, decisions, evaluation, demo, plan
-CLAUDE.md         guide for future coding sessions
-```
+Details and reasoning: [docs/roadmap.md](docs/roadmap.md). Decisions and measured trade-offs:
+[docs/decisions.md](docs/decisions.md).
 
-## Known limitations
+## Limitations
 
-Single-user local tool (no authentication); one job per session in-process; snapshot creation is
-synchronous and capped at 1500 files / 12 MB; symbol extraction is regex-based; follow-up rounds
-reuse the original evidence; the `node:sqlite` module prints an experimental warning. Snapshots store the
+Single-user local tool (no authentication); one job per session, in-process; snapshot creation is
+synchronous and capped at 1500 files / 12 MB; symbol extraction is regex-based; follow-up rounds reuse
+the original excerpts; the `node:sqlite` module prints an experimental warning. Snapshots store the
 contents of every readable file in the local SQLite file (`data/`, git-ignored); deleting a session
 removes them unless another session pins the same snapshot.

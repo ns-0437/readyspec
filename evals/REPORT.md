@@ -1,0 +1,97 @@
+# Evaluation report
+
+Status: **partial.** No model credentials were available when this was written, so the
+single-prompt baseline and every model-dependent metric of the staged workflow have **not been
+measured**. What follows is what was actually run, what it shows, and what it does not.
+Method: [docs/evaluation.md](../docs/evaluation.md).
+
+Run: 2026-09-21, fixture provider (no language model), `npm run eval -- --provider fixture`.
+Development set = 13 cases; held-out set = 7 cases (run once, after the retrieval code was frozen).
+
+## What was measured (real, deterministic)
+
+### Retrieval of the required files: ReadySpec staged workflow
+
+| Set | Cases | Required-file recall | Precision (required + helpful) | Distractor files / case |
+|---|---|---|---|---|
+| Development | 13 | 96% | 56% | 0.54 |
+| Held out | 7 | 100% | 58% | 0.57 |
+
+Per case, only one required file was missed in 20 cases: `src/api/routes.ts` for
+`demo-05-admin-skipped-log` ("Let admins see which notifications were skipped..."). The ticket shares
+no vocabulary with that file; lexical retrieval cannot find it. Every other required file was retrieved.
+
+### Static-checklist baseline (five generic questions for every ticket)
+
+| Set | Critical ambiguities asked | Unnecessary-question rate | Expected contradictions noticed | Required-file recall |
+|---|---|---|---|---|
+| Development | 3% | 98% | 0% | 0% (does not read the repository) |
+| Held out | 0% | 100% | 0% | 0% |
+
+A generic checklist is not a strawman by construction: it asks reasonable questions. It scores
+near zero because those questions are not specific to any ticket, which is the point of the
+comparison and also the limit of what this row shows. The keyword groups were checked to ensure
+this is not an artefact of over-strict matching: specific questions do match them (calibration
+test in `tests/eval.test.ts`).
+
+## What was not measured
+
+| Metric | Single prompt | ReadySpec staged | Reason |
+|---|---|---|---|
+| Evidence correctness (citation validity, support) | not run | not run | needs a live model |
+| Critical ambiguity detection | not run | not run | needs a live model |
+| Unnecessary questions | not run | not run | needs a live model |
+| Contradictions / insufficient evidence / injection | not run | not run | needs a live model |
+| Human correction effort | not run | not run | needs a live model and human scoring |
+| Latency and cost | not run | not run | needs a live model |
+
+The claim "ReadySpec resolves ambiguity better than a single prompt" is therefore **unsupported
+by any measurement in this repository.** The product hypothesis is unproven; the harness to test
+it exists.
+
+## Other evidence that the system does what it claims (tests, not benchmark)
+
+These are engineering tests (139 in `tests/`), not model-quality evidence:
+
+- Snapshots exclude secrets, binaries, generated and oversized files, never follow symlinks or
+  junctions, and pin content by hash. Traversal and out-of-root paths are rejected.
+- The verifier rejects, with specific codes: unknown or tampered citations, observed claims with no
+  evidence, observed claims naming code the citation does not contain, criteria without tests,
+  dangling references, invented or altered decisions, deferred questions presented as decided, and
+  dropped unresolved questions. A valid citation is shown to be insufficient on its own.
+- No model call happens before consent; only disclosed excerpts appear in prompts; excluded files'
+  contents never reach a prompt; repository text is fenced and the planted injection is flagged and
+  ignored (the injection document is retrieved for the demonstration ticket and the session still
+  asks its questions and does not approve).
+- Cancellation, transient provider failure, budget exhaustion and provider change are handled and
+  recoverable, with answers and evidence preserved.
+
+## Known weaknesses (failures, not spin)
+
+1. **Precision is low** (56-58%). Retrieval favours recall (`minItems: 6` raised recall from 92% to
+   96% on the dev set and cost 5 points of precision). About half the excerpts sent to a model are
+   not required or helpful for the ticket, which costs tokens and gives an injection-bearing
+   document more chances to be included.
+2. **Vocabulary gap.** The one missed required file is a pure vocabulary mismatch. Lexical retrieval
+   will keep missing files that a ticket describes in different words than the code uses.
+3. **Distractors get through** (0.54-0.57 per case), e.g. `taskboard/search.py` and `export.py` for a
+   "snooze reminders" ticket, `src/reports/sales-report.ts` for refund tickets.
+4. **Recall of 100% on the held-out set is a small-sample result** (7 cases, 3 tiny repositories) by a
+   system whose author also wrote the cases. It should not be read as a general recall estimate.
+5. **The support check is lexical.** It catches invented identifiers, not wrong meaning.
+6. **The static-checklist row does not test the interesting comparison.** The interesting one is
+   single prompt vs staged, and it is missing.
+
+## To complete this report
+
+1. Set `ANTHROPIC_API_KEY` (optionally `READYSPEC_MODEL`, `READYSPEC_PRICE_IN_PER_MTOK`,
+   `READYSPEC_PRICE_OUT_PER_MTOK`).
+2. `npm run eval -- --provider anthropic --set dev`, repeat a few times to see variance.
+3. Freeze the code; run `--set heldout` once.
+4. Fill the generated `human-scoring-sheet-*.csv` using `evals/rubrics/human-rubric.md`, ideally
+   blind and by someone other than the author.
+5. Replace this "not measured" table with the results, keep the failures, and re-read
+   `docs/evaluation.md` threats to validity before claiming anything.
+
+A live run is roughly four model calls per case per system pair (three staged, one single prompt):
+about 50 calls for the development set. Check cost with your own prices before running.

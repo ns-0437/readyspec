@@ -1,3 +1,4 @@
+import os from "node:os";
 import { beforeAll, describe, expect, it } from "vitest";
 import { SessionDetail } from "@/shared/schemas";
 import { DEMO_REPO, DEMO_TICKET } from "./helpers";
@@ -47,7 +48,7 @@ describe("API", () => {
     expect(res.status).toBe(400);
     res = await call("sessions", "POST", null, { repoPath: "relative", ticket: DEMO_TICKET });
     expect(res.status).toBe(400);
-    res = await call("sessions", "POST", null, { repoPath: "C:\\Windows", ticket: DEMO_TICKET });
+    res = await call("sessions", "POST", null, { repoPath: os.tmpdir(), ticket: DEMO_TICKET });
     expect(res.status).toBe(400);
     expect(JSON.stringify(await res.json())).toMatch(/allowed roots/);
   });

@@ -1,0 +1,23 @@
+{
+  "id": "demo-10-preference-history",
+  "repo": "demo-repository",
+  "cohort": "v2",
+  "ticket": "Keep a history of when a user changes their notification preferences.",
+  "category": "ambiguous",
+  "heldOut": true,
+  "notes": "updatePreferences overwrites in place and only keeps updatedAt. Storage, retention, visibility, and what counts as a change are open.",
+  "expectedFiles": {
+    "required": ["src/users/preferences.ts", "src/api/routes.ts"],
+    "helpful": ["src/auth/session.ts", "src/users/types.ts", "tests/preferences.test.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts", "src/notifications/digest.ts"],
+  "criticalAmbiguities": [
+    { "id": "retention", "description": "How long history is kept and where.", "anyOf": [["histor|audit|log", "retain|retention|how long|stor|persist|delete"]] },
+    { "id": "who-sees", "description": "Who may read the history (the user, admins).", "anyOf": [["histor|audit|log", "who|admin|visible|see|access|permission"]] },
+    { "id": "what-counts", "description": "Whether forced changes (security stays on) or no-op updates are recorded.", "anyOf": [["no-op|unchanged|forced|security|every update|only when", "histor|record|log|change"]] }
+  ],
+  "acceptableTopics": [[["actor|who changed|source|api|admin", "histor|change"]], [["privacy|pii|gdpr", "histor|log"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-already-tracked", "description": "Assuming history already exists.", "pattern": "(preference|change) history (is )?already (kept|stored|tracked|recorded)" }
+  ]
+}

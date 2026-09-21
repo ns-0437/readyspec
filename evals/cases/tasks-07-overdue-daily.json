@@ -1,0 +1,24 @@
+{
+  "id": "tasks-07-overdue-daily",
+  "repo": "team-tasks",
+  "cohort": "v2",
+  "ticket": "Mark tasks as overdue and remind assignees every day until they are done.",
+  "category": "ambiguous",
+  "heldOut": true,
+  "notes": "Reminders are one-shot (reminder_sent) and status has no overdue value. Daily cadence, quiet handling, stop conditions and status modelling are open.",
+  "expectedFiles": {
+    "required": ["taskboard/reminders.py", "taskboard/models.py"],
+    "helpful": ["taskboard/tasks.py", "taskboard/notifications.py", "tests/test_reminders.py", "docs/design.md"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/export.py", "taskboard/comments.py"],
+  "criticalAmbiguities": [
+    { "id": "status-model", "description": "Is overdue a stored status or derived from due date?", "anyOf": [["overdue", "status|derived|compute|stored|flag|field"]] },
+    { "id": "cadence", "description": "What 'every day' means (time of day, timezone, weekends).", "anyOf": [["day|daily", "time|timezone|weekend|hour|when"]] },
+    { "id": "stop-conditions", "description": "When reminders stop (done, archived, reassigned, cap).", "anyOf": [["stop|end|until", "archiv|reassign|cap|limit|maximum|done"]] },
+    { "id": "one-shot-flag", "description": "reminder_sent is a one-shot boolean; daily reminders need per-day state.", "anyOf": [["reminder_sent|sent flag|last sent|state", "daily|day|repeat"]] }
+  ],
+  "acceptableTopics": [[["escalat|manager|creator", "overdue"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-forever", "description": "Silently choosing unlimited daily reminders.", "pattern": "assume[^.]*(no limit|unlimited|indefinitely)[^.]*remind" }
+  ]
+}

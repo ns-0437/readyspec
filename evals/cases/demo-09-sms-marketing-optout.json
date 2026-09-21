@@ -1,0 +1,23 @@
+{
+  "id": "demo-09-sms-marketing-optout",
+  "repo": "demo-repository",
+  "cohort": "v2",
+  "ticket": "Let users opt out of SMS for marketing messages only, while keeping SMS for everything else.",
+  "category": "ambiguous",
+  "heldOut": true,
+  "notes": "Preferences store channels and categories independently; there is no per-category-per-channel matrix. Matrix shape, defaults, and security/billing interplay are open.",
+  "expectedFiles": {
+    "required": ["src/users/preferences.ts", "src/notifications/dispatcher.ts"],
+    "helpful": ["src/notifications/channels.ts", "src/notifications/types.ts", "src/api/routes.ts", "tests/dispatcher.test.ts", "tests/preferences.test.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts"],
+  "criticalAmbiguities": [
+    { "id": "data-model", "description": "Channels and categories are independent booleans; per-category channel choices need a new shape.", "anyOf": [["channel", "categor", "matrix|per-category|combination|model|shape|independent|store"]] },
+    { "id": "existing-users", "description": "Migration/default for existing preference records.", "anyOf": [["existing|migrat|default|already", "preference|user|record"]] },
+    { "id": "other-categories", "description": "Whether the same control should apply to billing/product/security.", "anyOf": [["security|billing|product|other categor", "sms"]] }
+  ],
+  "acceptableTopics": [[["api|endpoint|validation", "preference"]], [["sms", "consent|compliance|stop|legal"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-matrix-shape", "description": "Silently picking a data model.", "pattern": "assume[^.]*(matrix|nested|per-category)[^.]*(shape|structure|model)" }
+  ]
+}

@@ -37,8 +37,9 @@ async function main() {
 
   let cases = loadCases();
   if (set === "dev") cases = cases.filter((c) => !c.heldOut);
-  else if (set === "heldout") cases = cases.filter((c) => c.heldOut);
-  else if (set !== "all") throw new Error("--set must be dev, heldout or all");
+  else if (set === "heldout") cases = cases.filter((c) => c.heldOut && c.cohort === "v1");
+  else if (set === "heldout-v2") cases = cases.filter((c) => c.heldOut && c.cohort === "v2");
+  else if (set !== "all") throw new Error("--set must be dev, heldout, heldout-v2 or all");
   if (only.length) cases = cases.filter((c) => only.includes(c.id));
   if (set !== "dev") console.warn("NOTE: held-out cases should be run once, after the code is frozen. Do not tune against them.");
   console.log(`Running ${cases.length} case(s) x [${systems.join(", ")}] with ${provider.info.label}`);

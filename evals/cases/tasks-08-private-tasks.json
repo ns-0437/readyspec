@@ -1,0 +1,26 @@
+{
+  "id": "tasks-08-private-tasks",
+  "repo": "team-tasks",
+  "cohort": "v2",
+  "ticket": "Let a task's creator make it private so only its assignee can see it.",
+  "category": "conflicting-docs",
+  "heldOut": true,
+  "notes": "can_view_task says every active user sees every task and there are no private tasks. Admin visibility, listing/search leaks, and mentions are open.",
+  "expectedFiles": {
+    "required": ["taskboard/permissions.py", "taskboard/models.py"],
+    "helpful": ["taskboard/tasks.py", "taskboard/search.py", "taskboard/comments.py", "tests/test_permissions.py"]
+  },
+  "distractors": ["taskboard/export.py", "taskboard/reminders.py"],
+  "criticalAmbiguities": [
+    { "id": "admin-visibility", "description": "Whether admins (and the creator) can still see private tasks.", "anyOf": [["admin|creator", "private|see|view|visib"]] },
+    { "id": "leak-paths", "description": "search, listings, comments and mentions can leak private tasks.", "anyOf": [["search|list|mention|comment|export", "private|leak|visib|hidden"]] },
+    { "id": "existing-and-reassign", "description": "Existing tasks and what happens when the assignee changes.", "anyOf": [["reassign|change assignee|existing|migrat", "private"]] }
+  ],
+  "acceptableTopics": [[["notif", "private"]]],
+  "expectedContradictions": [
+    { "id": "no-private-tasks-today", "description": "can_view_task documents that all active users see all tasks.", "anyOf": [["view|visib", "all|every|no private|currently|today", "task"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "assume-admin-blind", "description": "Silently hiding private tasks from admins.", "pattern": "assume[^.]*admins? (cannot|can't|may not) (see|view)" }
+  ]
+}

@@ -16,6 +16,8 @@ export const EvalCase = z.object({
   ticket: z.string(),
   category: z.enum(["clear", "ambiguous", "conflicting-docs", "irrelevant-files", "misleading", "vague", "insufficient-evidence"]),
   heldOut: z.boolean(),
+  /** v1 held-out cases were run once and are contaminated by later retrieval tuning; v2 were written before that tuning and run once after it. */
+  cohort: z.enum(["v1", "v2"]).default("v1"),
   notes: z.string(),
   expectedFiles: z.object({ required: z.array(z.string()), helpful: z.array(z.string()) }),
   /** Files a good system should NOT need (used for precision). */

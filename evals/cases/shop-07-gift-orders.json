@@ -1,0 +1,23 @@
+{
+  "id": "shop-07-gift-orders",
+  "repo": "shop-orders",
+  "cohort": "v2",
+  "ticket": "Allow ordering as a gift, sending the confirmation to a different recipient email.",
+  "category": "ambiguous",
+  "heldOut": true,
+  "notes": "Order has a single customerEmail used for confirmation; refunds and future emails assume it is the payer. Gift semantics, prices in the email, and refund routing are open.",
+  "expectedFiles": {
+    "required": ["src/orders/checkout.ts", "src/notifications/order-emails.ts", "src/orders/order.ts"],
+    "helpful": ["src/api/handlers.ts", "src/orders/refunds.ts", "tests/refunds.test.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts", "src/orders/discounts.ts"],
+  "criticalAmbiguities": [
+    { "id": "who-gets-what", "description": "Whether the recipient or the buyer gets the confirmation, and whether prices are shown to a gift recipient.", "anyOf": [["recipient|gift", "price|amount|paid|show|hide|buyer|both"]] },
+    { "id": "later-emails", "description": "Refund and other later emails: buyer or recipient.", "anyOf": [["refund|later|future|other email", "recipient|gift|buyer|customer"]] },
+    { "id": "data-model", "description": "Order has only customerEmail; a recipient field is a model change.", "anyOf": [["recipient", "field|store|model|order|schema|customeremail"]] }
+  ],
+  "acceptableTopics": [[["message|note|wrap", "gift"]], [["valid|verify|format", "email"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-hide-prices", "description": "Silently hiding prices from the recipient.", "pattern": "assume[^.]*(hide|omit|exclude)[^.]*(price|amount)" }
+  ]
+}

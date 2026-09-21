@@ -1,0 +1,24 @@
+{
+  "id": "shop-08-back-in-stock",
+  "repo": "shop-orders",
+  "cohort": "v2",
+  "ticket": "Notify customers when an out-of-stock item is back in stock.",
+  "category": "insufficient-evidence",
+  "heldOut": true,
+  "notes": "There is no wishlist, subscription or waitlist concept, and release() is the only restock path. The system should say it cannot establish who to notify.",
+  "expectedFiles": {
+    "required": ["src/inventory/stock.ts"],
+    "helpful": ["src/notifications/order-emails.ts", "src/orders/refunds.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts", "src/orders/pricing.ts"],
+  "criticalAmbiguities": [
+    { "id": "who-to-notify", "description": "No subscription/waitlist exists: how do customers ask to be notified?", "anyOf": [["subscri|waitlist|wishlist|sign up|opt", "notif|customer|stock"]] },
+    { "id": "restock-trigger", "description": "What counts as back in stock (release on refund, threshold).", "anyOf": [["back in stock|restock|replenish", "when|trigger|threshold|refund|release|quantity"]] },
+    { "id": "dedupe", "description": "Notify once, and expire requests.", "anyOf": [["once|duplicate|repeat|expire|limit", "notif|request|subscri"]] }
+  ],
+  "acceptableTopics": [[["email|channel", "notif"]]],
+  "unacceptableAssumptions": [
+    { "id": "invents-waitlist", "description": "Inventing an existing waitlist.", "pattern": "(existing|current) (waitlist|wishlist|subscription)" }
+  ],
+  "shouldSayInsufficientEvidence": true
+}

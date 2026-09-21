@@ -1,0 +1,26 @@
+{
+  "id": "demo-04-quiet-hours",
+  "repo": "demo-repository",
+  "ticket": "Users should be able to set quiet hours in their local timezone.",
+  "category": "conflicting-docs",
+  "heldOut": true,
+  "notes": "docs/notifications.md claims quiet hours already exist; the code has no such field or check. A system that takes the docs at face value fails.",
+  "expectedFiles": {
+    "required": ["src/users/preferences.ts", "docs/notifications.md", "src/notifications/dispatcher.ts"],
+    "helpful": ["src/notifications/digest.ts", "src/users/types.ts", "src/api/routes.ts", "tests/digest.test.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts"],
+  "criticalAmbiguities": [
+    { "id": "security-exemption", "description": "Whether security alerts are exempt from quiet hours (docs say so).", "anyOf": [["security", "quiet"]] },
+    { "id": "null-timezone", "description": "Behavior when the user has no timezone (null).", "anyOf": [["timezone", "null|missing|unset|not set|fallback|default|no timezone"]] },
+    { "id": "overnight-and-dst", "description": "Ranges that cross midnight and daylight-saving changes.", "anyOf": [["overnight|midnight|wrap|cross|span"], ["dst|daylight"]] },
+    { "id": "held-or-dropped", "description": "Whether notifications during quiet hours are dropped, delayed or digested.", "anyOf": [["quiet", "drop|delay|held|queue|digest|defer|discard"]] }
+  ],
+  "acceptableTopics": [[["channel", "quiet"]], [["categor", "quiet"]]],
+  "expectedContradictions": [
+    { "id": "docs-claim-quiet-hours-exist", "description": "Docs describe configurable quiet hours; the code does not have them.", "anyOf": [["quiet", "doc", "not|no|missing|absent|does not|doesn't|isn't"], ["quiet", "notifications.md", "not|no|missing|absent"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "accepts-docs-as-fact", "description": "Treating quiet hours as already implemented.", "pattern": "quiet hours (already )?(exist|are implemented|is implemented|are supported)" }
+  ]
+}

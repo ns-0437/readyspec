@@ -1,0 +1,23 @@
+{
+  "id": "demo-03-weekly-digest",
+  "repo": "demo-repository",
+  "ticket": "Send marketing notifications only in a weekly digest email.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "digest.ts already has a daily/weekly frequency setting and a UTC fallback; the ticket collides with the existing setting and leaves timing and buffering unstated.",
+  "expectedFiles": {
+    "required": ["src/notifications/digest.ts", "src/notifications/dispatcher.ts", "src/users/preferences.ts"],
+    "helpful": ["docs/notifications.md", "src/notifications/types.ts", "tests/digest.test.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts"],
+  "criticalAmbiguities": [
+    { "id": "digest-timing", "description": "Which day and time the weekly digest goes out.", "anyOf": [["digest", "day|time|when|schedule|hour"]] },
+    { "id": "timezone", "description": "Timezone for the digest time (profile timezone may be null; digests fall back to UTC).", "anyOf": [["timezone|time zone|utc"]] },
+    { "id": "existing-setting", "description": "Interaction with the existing digestFrequency preference (off/daily/weekly).", "anyOf": [["digest", "frequency|existing|already|conflict|off|daily"]] },
+    { "id": "buffering", "description": "Where marketing notifications are held until the digest is sent.", "anyOf": [["digest", "store|persist|queue|buffer|hold|held"]] }
+  ],
+  "acceptableTopics": [[["unsubscrib|opt", "digest|marketing"]], [["template|content", "digest"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-weekday", "description": "Silently picking a send day.", "pattern": "assume[^.]*(monday|sunday|friday)" }
+  ]
+}

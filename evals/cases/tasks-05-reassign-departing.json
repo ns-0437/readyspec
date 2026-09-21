@@ -1,0 +1,24 @@
+{
+  "id": "tasks-05-reassign-departing",
+  "repo": "team-tasks",
+  "ticket": "Let admins reassign all open tasks from a departing user to someone else.",
+  "category": "ambiguous",
+  "heldOut": true,
+  "notes": "assign_task handles one task, resets reminder_sent and notifies. Bulk semantics, task states, notifications, departing-user state and auditing are open.",
+  "expectedFiles": {
+    "required": ["taskboard/tasks.py", "taskboard/permissions.py", "taskboard/models.py"],
+    "helpful": ["taskboard/notifications.py", "taskboard/reminders.py", "tests/test_tasks.py", "tests/test_permissions.py"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/export.py", "taskboard/comments.py"],
+  "criticalAmbiguities": [
+    { "id": "which-tasks", "description": "Whether done/archived tasks move too, and what counts as open.", "anyOf": [["task", "done|archived|complet|closed|open|status", "reassign|all"]] },
+    { "id": "notifications", "description": "Who is notified when a bulk reassignment happens (assign_task notifies the new assignee).", "anyOf": [["notif", "reassign|assignee|user|bulk|flood"]] },
+    { "id": "departing-user-state", "description": "What 'departing' means for the user record (inactive flag?).", "anyOf": [["depart|inactive|deactivat|leave|leaving|deleted|offboard", "user|account"]] },
+    { "id": "reminder-reset", "description": "reminder_sent is reset on assignment; effect on reminders.", "anyOf": [["reminder", "reset|sent|again|reassign"]] },
+    { "id": "audit", "description": "Audit trail for bulk changes.", "anyOf": [["audit|history|log", "reassign|change|bulk"]] }
+  ],
+  "acceptableTopics": [[["target|recipient|who", "reassign|assignee"]], [["atomic|partial|fail|all-or-nothing|transaction", "reassign|bulk"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-archived-moved", "description": "Silently reassigning archived/done tasks.", "pattern": "assume[^.]*(archived|done)[^.]*(also )?reassign" }
+  ]
+}

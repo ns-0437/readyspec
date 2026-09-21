@@ -1,0 +1,22 @@
+{
+  "id": "shop-03-refund-email",
+  "repo": "shop-orders",
+  "ticket": "Email the customer when their refund is issued.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "Only confirmation email exists and it is synchronous. Failure handling, content and recipient handling are open. Refund window docs conflict is a distraction here.",
+  "expectedFiles": {
+    "required": ["src/orders/refunds.ts", "src/notifications/order-emails.ts"],
+    "helpful": ["src/api/handlers.ts", "src/orders/order.ts", "tests/refunds.test.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts", "src/orders/discounts.ts"],
+  "criticalAmbiguities": [
+    { "id": "failure-handling", "description": "Whether an email failure should block or roll back the refund.", "anyOf": [["fail|error|retry|synchron|block|roll", "email|mail"]] },
+    { "id": "content", "description": "What the refund email contains (amount, items, timing).", "anyOf": [["content|amount|template|wording|include|body|contain", "email|refund"]] },
+    { "id": "recipient", "description": "Which address receives it (order address vs current profile).", "anyOf": [["recipient|address|current|changed", "email|customer"]] }
+  ],
+  "acceptableTopics": [[["partial", "refund|email"]], [["opt|unsubscrib|preference", "email"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-failures-ignored", "description": "Silently ignoring email failures.", "pattern": "assume[^.]*email failures?[^.]*(ignored|swallowed|silently)" }
+  ]
+}

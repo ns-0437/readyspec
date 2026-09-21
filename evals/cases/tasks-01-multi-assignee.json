@@ -1,0 +1,23 @@
+{
+  "id": "tasks-01-multi-assignee",
+  "repo": "team-tasks",
+  "ticket": "Allow a task to have more than one assignee.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "Task.assignee is a single optional string and is assumed by permissions, reminders, notifications and tasks_for. Completion semantics, reminders, permissions and migration are open.",
+  "expectedFiles": {
+    "required": ["taskboard/models.py", "taskboard/tasks.py", "taskboard/permissions.py"],
+    "helpful": ["taskboard/reminders.py", "taskboard/notifications.py", "docs/design.md", "tests/test_tasks.py", "tests/test_permissions.py"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/export.py"],
+  "criticalAmbiguities": [
+    { "id": "reminders-who", "description": "Who receives reminders when there are several assignees.", "anyOf": [["remind", "assignee|all|each|everyone|who|every"]] },
+    { "id": "completion", "description": "Whether any or all assignees must complete the task.", "anyOf": [["complet|done", "any|all|each|every|assignee"]] },
+    { "id": "edit-permission", "description": "Edit rights for each assignee.", "anyOf": [["edit|permission", "assignee|all|any"]] },
+    { "id": "data-migration", "description": "Existing single-assignee data.", "anyOf": [["existing|migrat|backward|data", "task|assignee"]] }
+  ],
+  "acceptableTopics": [[["notif", "assign"]], [["limit|maximum|max", "assignee"]], [["tasks_for|my tasks|list", "assignee"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-any-completes", "description": "Silently choosing completion semantics.", "pattern": "assume[^.]*(any|either) assignee[^.]*complet" }
+  ]
+}

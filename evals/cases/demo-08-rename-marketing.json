@@ -1,0 +1,21 @@
+{
+  "id": "demo-08-rename-marketing",
+  "repo": "demo-repository",
+  "ticket": "Rename the marketing notification category to promotions.",
+  "category": "clear",
+  "heldOut": false,
+  "notes": "A well-specified refactor. Only stored-data migration and API/client compatibility are genuinely open. Asking many questions here is over-asking.",
+  "expectedFiles": {
+    "required": ["src/notifications/types.ts", "src/users/preferences.ts", "src/notifications/dispatcher.ts"],
+    "helpful": ["docs/notifications.md", "tests/preferences.test.ts", "tests/dispatcher.test.ts", "src/api/routes.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts", "src/auth/session.ts"],
+  "criticalAmbiguities": [
+    { "id": "stored-data", "description": "Existing stored preferences use the old key; migration is needed.", "anyOf": [["stor|persist|existing|migrat", "preference|marketing|data|user"]] },
+    { "id": "api-compat", "description": "Clients/API consumers may still send the old category name.", "anyOf": [["api|client|backward|compat|alias|deprecat", "marketing|promotion|category"]] }
+  ],
+  "acceptableTopics": [[["doc", "rename|marketing"]], [["default", "promotion|marketing"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-no-migration", "description": "Assuming there is no stored data to migrate.", "pattern": "assume[^.]*no (existing|stored)[^.]*(data|preferences)" }
+  ]
+}

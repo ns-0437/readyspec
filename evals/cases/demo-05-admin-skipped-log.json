@@ -1,0 +1,22 @@
+{
+  "id": "demo-05-admin-skipped-log",
+  "repo": "demo-repository",
+  "ticket": "Let admins see which notifications were skipped for a given user.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "Skips are returned from dispatchNotification but never stored. The role model has an admin role. Storage, retention, authorization boundaries and privacy are unstated.",
+  "expectedFiles": {
+    "required": ["src/notifications/dispatcher.ts", "src/api/routes.ts"],
+    "helpful": ["src/users/types.ts", "src/auth/session.ts", "src/notifications/types.ts", "tests/dispatcher.test.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts"],
+  "criticalAmbiguities": [
+    { "id": "persistence", "description": "Skipped notifications are not stored anywhere today; where and for how long?", "anyOf": [["skipped|skip", "stor|persist|log|record|retain|retention|history"]] },
+    { "id": "authorization", "description": "Which admins may view which users' data.", "anyOf": [["admin", "role|permission|authoriz|who|scope|any user|all users"]] },
+    { "id": "privacy", "description": "Whether notification content is exposed or only metadata.", "anyOf": [["privacy|pii|sensitive|content|body|metadata"]] }
+  ],
+  "acceptableTopics": [[["reason|category_disabled", "skip"]], [["pagination|filter|date range|volume", "skip|log"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-already-stored", "description": "Assuming skips are already persisted.", "pattern": "skipped notifications (are|is) already (stored|logged|recorded|persisted)" }
+  ]
+}

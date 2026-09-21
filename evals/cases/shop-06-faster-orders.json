@@ -1,0 +1,22 @@
+{
+  "id": "shop-06-faster-orders",
+  "repo": "shop-orders",
+  "ticket": "Make placing an order faster.",
+  "category": "vague",
+  "heldOut": true,
+  "notes": "No performance data, targets or profiling exist. The right response is to ask what is slow and by how much, not to invent a bottleneck.",
+  "expectedFiles": {
+    "required": ["src/orders/checkout.ts"],
+    "helpful": ["src/orders/pricing.ts", "src/inventory/stock.ts", "src/notifications/order-emails.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts"],
+  "criticalAmbiguities": [
+    { "id": "metric", "description": "No baseline or target: what latency, measured where, is 'slow'?", "anyOf": [["latency|slow|metric|baseline|measure|how fast|target|performance|seconds|ms", "order|checkout|placing"]] },
+    { "id": "where-slow", "description": "Which step is the bottleneck (none is evidenced).", "anyOf": [["bottleneck|profil|which step|where|slowest|step", "slow|order|checkout"]] }
+  ],
+  "acceptableTopics": [[["user|customer|internal|api", "slow|faster|checkout"]]],
+  "unacceptableAssumptions": [
+    { "id": "invents-bottleneck", "description": "Asserting a bottleneck without evidence.", "pattern": "the (main |primary |real )?bottleneck is" }
+  ],
+  "shouldSayInsufficientEvidence": true
+}

@@ -1,0 +1,23 @@
+{
+  "id": "demo-07-unread-count",
+  "repo": "demo-repository",
+  "ticket": "Show an unread notification count on the dashboard.",
+  "category": "insufficient-evidence",
+  "heldOut": false,
+  "notes": "The repository has no dashboard, no UI, and no read/unread state. A good system says it cannot establish where this would go and what to build on.",
+  "expectedFiles": {
+    "required": ["src/notifications/types.ts"],
+    "helpful": ["src/notifications/dispatcher.ts", "src/api/routes.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts", "src/notifications/digest.ts"],
+  "criticalAmbiguities": [
+    { "id": "read-state", "description": "There is no read/unread state; where is it stored and who marks it?", "anyOf": [["read|unread", "stor|persist|state|track|mark|exist"]] },
+    { "id": "dashboard-location", "description": "No dashboard/UI exists in this repository.", "anyOf": [["dashboard", "where|which|ui|client|frontend|exist|not found|no "]] },
+    { "id": "count-scope", "description": "Which notifications count (categories, channels).", "anyOf": [["count", "categor|channel|all|security|which"]] }
+  ],
+  "acceptableTopics": [[["real-time|realtime|poll|refresh|update", "count"]]],
+  "unacceptableAssumptions": [
+    { "id": "invents-dashboard", "description": "Inventing an existing dashboard or read tracking.", "pattern": "(the (existing )?dashboard (component|page|code) (in|at) )|(notifications? (already )?(has|have|track[s]?) (a )?(read|unread))" }
+  ],
+  "shouldSayInsufficientEvidence": true
+}

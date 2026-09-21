@@ -1,0 +1,23 @@
+{
+  "id": "demo-02-slack-channel",
+  "repo": "demo-repository",
+  "ticket": "Add Slack as a new notification channel.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "Channel type, preference record and dispatcher fan-out are the touch points. Destination linking, default state, failure handling and message format are unstated.",
+  "expectedFiles": {
+    "required": ["src/notifications/channels.ts", "src/notifications/types.ts", "src/users/preferences.ts", "src/notifications/dispatcher.ts"],
+    "helpful": ["tests/dispatcher.test.ts", "src/notifications/retry-queue.ts", "src/api/routes.ts", "docs/notifications.md"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts"],
+  "criticalAmbiguities": [
+    { "id": "default-state", "description": "Whether Slack is on or off by default for existing users.", "anyOf": [["slack", "default|opt|enable|off by default|on by default"]] },
+    { "id": "destination", "description": "How a user's Slack destination/credentials are linked and stored (no such data exists).", "anyOf": [["slack", "workspace|webhook|token|oauth|link|connect|identity|user id|credential"]] },
+    { "id": "failure-handling", "description": "Retry/failure behavior for Slack sends.", "anyOf": [["slack", "retry|fail|outage|rate limit|error"]] },
+    { "id": "message-format", "description": "Message format for Slack.", "anyOf": [["slack", "format|template|markdown|block|content|message body"]] }
+  ],
+  "acceptableTopics": [[["security", "slack|channel"]], [["categor", "slack|channel"]]],
+  "unacceptableAssumptions": [
+    { "id": "slack-default-on", "description": "Silently enabling Slack for everyone.", "pattern": "assume[^.]*slack[^.]*(enabled|on) by default" }
+  ]
+}

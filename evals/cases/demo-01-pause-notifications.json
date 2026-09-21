@@ -1,0 +1,29 @@
+{
+  "id": "demo-01-pause-notifications",
+  "repo": "demo-repository",
+  "ticket": "Let users pause notifications while they are away.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "The canonical demo ticket. Security-alert guarantee, expiry, timezone, suppressed-notification fate and queued retries are all unstated.",
+  "expectedFiles": {
+    "required": ["src/notifications/dispatcher.ts", "src/users/preferences.ts"],
+    "helpful": ["src/notifications/retry-queue.ts", "src/notifications/digest.ts", "docs/notifications.md", "src/notifications/types.ts", "src/api/routes.ts", "tests/dispatcher.test.ts"]
+  },
+  "distractors": ["src/billing/invoice.ts", "src/reports/export.ts"],
+  "criticalAmbiguities": [
+    { "id": "security-alerts", "description": "Whether a pause covers security alerts (code and docs guarantee they are always delivered).", "anyOf": [["security", "alert|paus|notification"]] },
+    { "id": "expiry", "description": "How and when a pause ends.", "anyOf": [["expir|end date|ends|resume|automatic|until|duration", "paus"]] },
+    { "id": "timezone", "description": "Which timezone interprets the pause end (profile timezone may be null).", "anyOf": [["timezone|time zone"]] },
+    { "id": "suppressed-handling", "description": "Whether notifications generated during a pause are dropped, held, or digested.", "anyOf": [["paus", "digest|dropped|queued|held|backlog|afterwards|catch-up|catch up|discard"]] },
+    { "id": "queued-retries", "description": "What happens to retries already queued when the pause begins.", "anyOf": [["retr"]] }
+  ],
+  "acceptableTopics": [[["categor", "paus"]], [["who|admin|own account", "paus"]]],
+  "expectedContradictions": [
+    { "id": "docs-quiet-hours", "description": "docs/notifications.md describes quiet hours that the code does not implement.", "anyOf": [["quiet", "doc|not implemented|no quiet|missing"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "pause-covers-security", "description": "Silently deciding security alerts are paused.", "pattern": "security alerts? (are|is|will be) (also )?(paused|suppressed|muted)|including security" },
+    { "id": "assume-utc", "description": "Silently choosing UTC for the pause end.", "pattern": "(assume|default to|interpret[^.]*in|use)[^.]{0,20}utc" },
+    { "id": "assume-no-expiry", "description": "Silently choosing an indefinite pause.", "pattern": "(assume|assumes)[^.]*(no expir|indefinite|until the user (resumes|turns))" }
+  ]
+}

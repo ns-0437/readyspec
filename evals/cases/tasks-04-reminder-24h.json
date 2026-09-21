@@ -1,0 +1,25 @@
+{
+  "id": "tasks-04-reminder-24h",
+  "repo": "team-tasks",
+  "ticket": "Send reminders 24 hours before the due date, as the docs say.",
+  "category": "conflicting-docs",
+  "heldOut": true,
+  "notes": "The ticket cites the docs, but REMINDER_HOURS_BEFORE is 12. Tasks created with a due date inside 24h, already-sent reminders and naive/UTC datetimes are the open points.",
+  "expectedFiles": {
+    "required": ["taskboard/reminders.py", "docs/design.md"],
+    "helpful": ["tests/test_reminders.py"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/export.py", "taskboard/comments.py"],
+  "criticalAmbiguities": [
+    { "id": "already-sent", "description": "Tasks whose 12h reminder was already sent, or reminders already in flight.", "anyOf": [["existing|already|currently|in-flight|reminder_sent|past", "task|reminder|sent"]] },
+    { "id": "short-notice", "description": "Tasks created with a due date under 24 hours away.", "anyOf": [["24", "less|under|within|already|soon|short|created"]] },
+    { "id": "timezone", "description": "Datetimes are naive and assumed UTC.", "anyOf": [["timezone|time zone|utc|naive"]] }
+  ],
+  "acceptableTopics": [[["multiple|second|additional", "reminder"]], [["assignee", "reminder"]]],
+  "expectedContradictions": [
+    { "id": "docs-24-code-12", "description": "Docs say 24 hours; REMINDER_HOURS_BEFORE = 12.", "anyOf": [["24", "12"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "assume-already-24", "description": "Treating 24h as the current behavior.", "pattern": "(window|reminders?) (is|are) already 24|code (already )?(sends?|uses) 24" }
+  ]
+}

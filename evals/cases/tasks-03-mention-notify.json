@@ -1,0 +1,25 @@
+{
+  "id": "tasks-03-mention-notify",
+  "repo": "team-tasks",
+  "ticket": "Notify users when they are @mentioned in a comment.",
+  "category": "conflicting-docs",
+  "heldOut": true,
+  "notes": "docs/design.md says mentioned users are notified, but add_comment explicitly does NOT notify anyone. Unknown/inactive users, self-mentions and duplicates are open.",
+  "expectedFiles": {
+    "required": ["taskboard/comments.py", "taskboard/notifications.py"],
+    "helpful": ["taskboard/permissions.py", "taskboard/models.py", "docs/design.md", "tests/test_tasks.py"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/export.py", "taskboard/reminders.py"],
+  "criticalAmbiguities": [
+    { "id": "unknown-or-inactive", "description": "Mentions of unknown or inactive users (notify() silently skips inactive users).", "anyOf": [["mention", "inactive|not exist|unknown|invalid|non-?existent|deleted|no such"]] },
+    { "id": "self-mention", "description": "Whether authors are notified about mentioning themselves.", "anyOf": [["mention", "self|author|themselves|own"]] },
+    { "id": "dedupe", "description": "Repeated mentions / multiple mentions in one comment.", "anyOf": [["duplicate|multiple|once|dedupe|repeat|twice", "mention|notif"]] }
+  ],
+  "acceptableTopics": [[["permission|access|visib|view", "mention|task"]], [["edit|delete", "comment"]]],
+  "expectedContradictions": [
+    { "id": "docs-say-already-notified", "description": "Docs say mentioned users are notified; the code stores mentions but notifies nobody.", "anyOf": [["doc", "notif", "not|no|doesn't|does not|never|missing"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "assume-already-notified", "description": "Accepting the docs' claim as current behavior.", "pattern": "mentioned users (are|is) already notified|already notif(ies|y) mentioned" }
+  ]
+}

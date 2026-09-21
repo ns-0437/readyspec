@@ -1,0 +1,22 @@
+{
+  "id": "tasks-06-export-tasks-csv",
+  "repo": "team-tasks",
+  "ticket": "Add a CSV export of a user's tasks.",
+  "category": "clear",
+  "heldOut": false,
+  "notes": "export.py already exports users as CSV and is the natural home. The ticket is mostly specified; fields, status filter and who may export another user's tasks are the only real gaps.",
+  "expectedFiles": {
+    "required": ["taskboard/export.py", "taskboard/tasks.py"],
+    "helpful": ["taskboard/models.py", "taskboard/permissions.py"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/comments.py", "taskboard/reminders.py"],
+  "criticalAmbiguities": [
+    { "id": "fields", "description": "Which columns to export.", "anyOf": [["field|column", "export|csv|task"]] },
+    { "id": "who-can-export", "description": "May one user export another user's tasks (admin)?", "anyOf": [["permission|who|admin|own|other|another", "export|csv"]] },
+    { "id": "status-filter", "description": "Whether done/archived tasks are included.", "anyOf": [["status|done|archived|open|complet", "export|csv|include"]] }
+  ],
+  "acceptableTopics": [[["encod|escap|comma|quote", "csv"]], [["large|volume|stream|size", "export|csv"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-all-users", "description": "Silently allowing anyone to export anyone's tasks.", "pattern": "assume[^.]*(any user|everyone)[^.]*export" }
+  ]
+}

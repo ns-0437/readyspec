@@ -1,0 +1,23 @@
+{
+  "id": "tasks-02-snooze-reminders",
+  "repo": "team-tasks",
+  "ticket": "Let users snooze a reminder.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "Reminders fire once (reminder_sent flag) at REMINDER_HOURS_BEFORE. Snooze duration, scope, repeats and the reminder_sent state are open.",
+  "expectedFiles": {
+    "required": ["taskboard/reminders.py", "taskboard/models.py"],
+    "helpful": ["taskboard/notifications.py", "tests/test_reminders.py", "docs/design.md", "taskboard/tasks.py"]
+  },
+  "distractors": ["taskboard/search.py", "taskboard/export.py", "taskboard/comments.py"],
+  "criticalAmbiguities": [
+    { "id": "duration", "description": "How long a snooze lasts (fixed options, custom, until when).", "anyOf": [["snooze", "how long|duration|hour|minute|until|fixed|custom|option"]] },
+    { "id": "scope", "description": "Per task vs per user snooze.", "anyOf": [["snooze", "per user|per task|assignee|all|each|every"]] },
+    { "id": "repeats", "description": "Limits on repeated snoozing, and snoozing past the due date.", "anyOf": [["snooze", "limit|max|multiple|repeat|again|after due|overdue|past"]] },
+    { "id": "state", "description": "reminder_sent is a one-shot flag; snoozing needs state.", "anyOf": [["reminder_sent|sent flag|state|reset|flag", "snooze|remind"]] }
+  ],
+  "acceptableTopics": [[["notif", "snooze"]], [["ui|api|endpoint", "snooze"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-duration", "description": "Silently choosing a snooze duration.", "pattern": "assume[^.]*snooze[^.]*(15|30|60|1 hour|one hour|10 minutes)" }
+  ]
+}

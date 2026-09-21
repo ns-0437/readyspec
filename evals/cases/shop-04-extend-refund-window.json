@@ -1,0 +1,24 @@
+{
+  "id": "shop-04-extend-refund-window",
+  "repo": "shop-orders",
+  "ticket": "Extend the refund window to 30 days.",
+  "category": "conflicting-docs",
+  "heldOut": true,
+  "notes": "docs/orders.md already says 30 days, but REFUND_WINDOW_DAYS is 14. A good system notices the doc/code mismatch and asks which is intended and whether existing orders are affected.",
+  "expectedFiles": {
+    "required": ["src/orders/refunds.ts", "docs/orders.md"],
+    "helpful": ["tests/refunds.test.ts", "src/api/handlers.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts", "src/orders/discounts.ts", "src/orders/pricing.ts"],
+  "criticalAmbiguities": [
+    { "id": "existing-orders", "description": "Whether the longer window applies to orders already placed.", "anyOf": [["existing|already|past|retroactive|old|previously placed", "order|refund"]] },
+    { "id": "doc-code-mismatch", "description": "Docs and code disagree (30 vs 14); which reflects the intended policy.", "anyOf": [["doc", "30|14|already|mismatch|disagree|differ|contradict|conflict"]] }
+  ],
+  "acceptableTopics": [[["partial", "refund"]], [["shipped|delivery", "window|refund"]]],
+  "expectedContradictions": [
+    { "id": "docs-30-code-14", "description": "docs/orders.md says 30 days; the code uses 14.", "anyOf": [["30", "14"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "assume-docs-correct", "description": "Treating the docs value as the current behavior.", "pattern": "(the )?(refund )?window is already 30|already (uses|allows|set to) 30" }
+  ]
+}

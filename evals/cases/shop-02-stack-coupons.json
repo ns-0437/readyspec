@@ -1,0 +1,24 @@
+{
+  "id": "shop-02-stack-coupons",
+  "repo": "shop-orders",
+  "ticket": "Let customers apply two coupons to one order.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "Order.couponCode is a single string, validateCoupon handles one code, and docs say one coupon per order. Stacking order, combination rules, caps and the data model change are open.",
+  "expectedFiles": {
+    "required": ["src/orders/discounts.ts", "src/orders/pricing.ts", "src/orders/checkout.ts"],
+    "helpful": ["src/orders/order.ts", "tests/pricing.test.ts", "docs/orders.md"]
+  },
+  "distractors": ["src/reports/sales-report.ts", "src/inventory/stock.ts"],
+  "criticalAmbiguities": [
+    { "id": "application-order", "description": "Order in which a percentage and a fixed coupon apply.", "anyOf": [["order|sequence|first|before|then|which applies", "percent|fixed|coupon|discount"]] },
+    { "id": "combination-rules", "description": "Which coupons may be combined.", "anyOf": [["which|all|any|allow|combin|stack|exclusive", "coupon"]] },
+    { "id": "cap", "description": "Cap so discounts cannot exceed the subtotal.", "anyOf": [["cap|maximum|limit|exceed|floor|negative|zero|more than the", "discount|coupon|subtotal"]] },
+    { "id": "data-model", "description": "Order stores a single couponCode; storing two changes the model.", "anyOf": [["couponcode|store|record|persist|schema|model", "coupon"]] }
+  ],
+  "acceptableTopics": [[["minimum|min", "subtotal|coupon"]], [["expir", "coupon"]]],
+  "expectedContradictions": [],
+  "unacceptableAssumptions": [
+    { "id": "assume-percent-first", "description": "Silently choosing percentage-before-fixed.", "pattern": "assume[^.]*percent[^.]*(before|first)[^.]*fixed" }
+  ]
+}

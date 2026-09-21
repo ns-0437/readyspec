@@ -1,0 +1,23 @@
+{
+  "id": "shop-01-partial-refunds",
+  "repo": "shop-orders",
+  "ticket": "Allow partial refunds for an order.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "refundOrder is all-or-nothing (paidCents, every line restocked). Partial semantics touch amount-vs-items, tax, restock, cumulative limits and the window.",
+  "expectedFiles": {
+    "required": ["src/orders/refunds.ts", "src/orders/order.ts"],
+    "helpful": ["src/inventory/stock.ts", "src/orders/pricing.ts", "docs/orders.md", "tests/refunds.test.ts", "src/api/handlers.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts"],
+  "criticalAmbiguities": [
+    { "id": "amount-or-items", "description": "Partial by amount or by line items/quantities.", "anyOf": [["partial", "amount|item|line|quantity|per"]] },
+    { "id": "tax-and-discount", "description": "How tax and discounts are apportioned in a partial refund.", "anyOf": [["tax|discount|coupon", "refund|partial|proportion"]] },
+    { "id": "restock", "description": "Whether and how stock is returned for partial refunds.", "anyOf": [["stock|inventory|restock", "partial|refund"]] },
+    { "id": "cumulative-limit", "description": "Multiple partial refunds and the cumulative cap.", "anyOf": [["multiple|several|cumulative|repeated|more than one|total|already refunded", "refund|partial"]] }
+  ],
+  "acceptableTopics": [[["window|days", "refund|partial"]], [["support|role|who", "refund"]], [["email|notif", "refund"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-tax-excluded", "description": "Silently deciding tax is not refunded.", "pattern": "assume[^.]*(tax|shipping)[^.]*(not refunded|excluded|non-refundable)" }
+  ]
+}

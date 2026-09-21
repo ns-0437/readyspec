@@ -1,0 +1,23 @@
+{
+  "id": "shop-05-low-stock-warning",
+  "repo": "shop-orders",
+  "ticket": "Warn admins about low stock when an order is placed.",
+  "category": "irrelevant-files",
+  "heldOut": false,
+  "notes": "isLowStock and LOW_STOCK_THRESHOLD exist, but there is no 'admin' role (only customer/support) and no admin notification path. The sales report is a distractor.",
+  "expectedFiles": {
+    "required": ["src/inventory/stock.ts", "src/orders/checkout.ts"],
+    "helpful": ["src/api/handlers.ts", "src/notifications/order-emails.ts"]
+  },
+  "distractors": ["src/reports/sales-report.ts", "src/orders/discounts.ts"],
+  "criticalAmbiguities": [
+    { "id": "who-are-admins", "description": "There is no admin role (only customer and support).", "anyOf": [["admin", "role|who|exist|defin|support|recipient"]] },
+    { "id": "how-to-warn", "description": "Delivery mechanism for the warning.", "anyOf": [["warn|alert", "email|ui|channel|how|where|notification|log|dashboard"]] },
+    { "id": "threshold", "description": "Threshold is a hard-coded constant (5); is it per SKU/configurable?", "anyOf": [["threshold|low", "configur|per|sku|constant|hard|5"]] },
+    { "id": "dedupe", "description": "Avoiding a warning on every order once stock is low.", "anyOf": [["repeat|duplicate|every|once|spam|each|dedupe|throttl", "warn|alert|order"]] }
+  ],
+  "acceptableTopics": [[["reserve|rollback|failed", "order|stock"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-admin-role-exists", "description": "Assuming an admin role exists in this codebase.", "pattern": "admin role (already )?exists?|existing admin role" }
+  ]
+}

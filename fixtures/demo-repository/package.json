@@ -1,0 +1,7 @@
+{
+  "name": "demo-notifier",
+  "version": "0.0.1",
+  "private": true,
+  "description": "READYSPEC DEMO FIXTURE - fictional, not BetterMe code",
+  "scripts": { "test": "node --test \"tests/*.test.ts\"" }
+}

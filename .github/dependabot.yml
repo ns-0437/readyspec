@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Next.js, React and their type packages move in lockstep; one PR instead of three.
+      next-react:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Lint/type tooling: low-risk to batch, high-noise if not.
+      lint-and-types:
+        patterns:
+          - "eslint*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+          - "@eslint/*"
+          - "typescript"
+    ignore:
+      # zod 4's schema shapes (z.record, nullable rendering, etc.) are load-bearing for the two
+      # live LLM adapters (src/server/llm/anthropic.ts, gemini.ts) in ways that were only found by
+      # testing against a real API (docs/decisions.md 14) -- a major bump needs a deliberate,
+      # tested upgrade, not an automatic PR.
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

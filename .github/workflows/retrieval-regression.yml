@@ -1,0 +1,31 @@
+name: Retrieval regression check
+
+# Deterministic and key-free (fixture provider only): compares the staged workflow's retrieval
+# recall/precision/distractor rate against evals/baseline-retrieval.json (see
+# evals/runners/regression.ts). Runs weekly to catch silent drift from unrelated changes, and on
+# any PR that touches retrieval, its inputs, or the baseline itself, so a regression is visible
+# before merge rather than discovered on a schedule days later.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/server/repository/**"
+      - "src/server/workflow/investigate.ts"
+      - "fixtures/**"
+      - "evals/cases/**"
+      - "evals/baseline-retrieval.json"
+      - "evals/runners/**"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run eval:regression

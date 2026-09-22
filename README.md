@@ -25,9 +25,9 @@ about existing behavior points at code; every proposed change connects to a requ
 | Works and is tested | Not done / not validated |
 |---|---|
 | Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **Anthropic has never run against a real API** (no key). Only tested against a local mock server. |
-| **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | **No model-quality benchmark result exists yet.** The harness, 26 cases and human rubric are ready; `npm run eval` against a real provider has not been run (needs dozens of calls) |
+| **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | **No model-quality benchmark result exists yet.** The harness, 30 cases (four fixture repositories, one now larger than the retrieval budget) and human rubric are ready; `npm run eval` against a real provider has not been run (needs dozens of calls) |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 157 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
+| 162 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
 | Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
@@ -152,13 +152,14 @@ Copy `.env.example` to `.env.local`. All optional.
 
 ## Evaluation
 
-Twenty-six hand-authored tickets over three small fictional repositories (TypeScript and Python), thirteen
-held out in two cohorts, compared across a static checklist, a single prompt and the staged workflow.
+Thirty hand-authored tickets over four small fictional repositories (TypeScript and Python) — one of them,
+`helpdesk-platform`, deliberately larger than the retrieval budget so a single prompt actually gets truncated —
+thirteen held out in two cohorts, compared across a static checklist, a single prompt and the staged workflow.
 
-| What was actually measured (deterministic) | Development (13) | Held-out v2 (6, clean) |
-|---|---|---|
-| Staged retrieval: required-file recall | 96% | 100% |
-| Staged retrieval: precision | 57% | 48% |
+| What was actually measured (deterministic) | Development (17) | — helpdesk-platform alone (4) | Held-out v2 (6, clean) |
+|---|---|---|---|
+| Staged retrieval: required-file recall | 97% | 100% | 100% |
+| Staged retrieval: precision | 52% | 36% | 48% |
 | Static checklist: critical ambiguities asked | 3% | 0% |
 
 The model-dependent comparison (evidence correctness, ambiguity detection, unnecessary questions,

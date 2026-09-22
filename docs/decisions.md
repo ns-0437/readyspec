@@ -75,7 +75,7 @@ build the backend first and drive the real interface with the fixture provider, 
 what the demo uses. There is no separate mock UI.
 
 ## 12. Evaluation design
-Twenty-six hand-authored cases over three small repositories; thirteen are held out in two cohorts (see 13; run once, after
+Thirty hand-authored cases over four small repositories (a fourth, larger one added in 15); thirteen are held out in two cohorts (see 13; run once, after
 code freeze). Ambiguity/assumption/contradiction scoring uses keyword groups: deterministic and
 auditable but crude. Calibration tests check the groups are not trivially satisfied (the generic
 checklist scores about 3%) and are satisfiable (natural specific questions score >= 80%). The
@@ -134,3 +134,22 @@ the app classified it as recoverable, kept all 3 decisions and 17 evidence items
 scripted mock. **What this does not yet cover:** the model-dependent benchmark (`npm run eval`)
 has not been run — that's dozens of calls and would need the quota to reset first — and Anthropic
 remains completely unvalidated. See `evals/REPORT.md`.
+
+## 15. A fourth fixture (helpdesk-platform) sized to actually exceed the retrieval budget
+Every case run so far, including the live Gemini one, carried a footnote: "single-prompt baseline saw the whole
+repository (0 of N cases truncated), so retrieval gives ReadySpec no advantage on small repositories." The three
+original fixtures are 6-11K characters; the retrieval budget is 24,000. `fixtures/repos/helpdesk-platform`
+(IT ticketing: tickets, agents, SLA clock, routing, macros, KB, notifications, surveys, audit log, custom fields;
+~30,800 characters) was sized specifically to cross that line, with four new dev-set cases against it. Confirmed
+live (fixture provider, deterministic): the single-prompt context report now reads "4 of 4 cases were truncated,"
+the first time that number has been anything but zero. Staged retrieval on it: 100% required-file recall, 36%
+precision (down from 48-57% on the smaller repos, as expected on a larger, more varied codebase), 1.25
+distractors/case. This does not yet answer whether staged actually beats a truncated single prompt in practice
+(still needs a live model run), but the benchmark can now, for the first time, actually pose that question.
+
+While building the fixture, also fixed a real bug this exposed: `aggregate()` in `evals/runners/score.ts` was
+discarding retrieval metrics for any case whose overall system output carried an error — but `runStaged`'s
+retrieval step runs entirely before any model call, so a case that failed later (e.g. a live 429) still has real,
+correct retrieval data that should not be thrown away. Confirmed against the live Gemini run from earlier the same
+day, where every model call had failed on quota: re-aggregating its raw output with the fix recovered real
+retrieval numbers (96% recall, 57% precision) that the original run had reported as "n/a".

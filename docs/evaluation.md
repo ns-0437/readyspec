@@ -14,7 +14,7 @@ to market.
 
 ## Cases
 
-`evals/cases/*.json`: 26 tickets over three small fictional repositories written for this
+`evals/cases/*.json`: 30 tickets over four small fictional repositories written for this
 project (`fixtures/demo-repository` TypeScript, `fixtures/repos/shop-orders` TypeScript,
 `fixtures/repos/team-tasks` Python). Kinds: clear (2), ambiguous (14), conflicting documentation
 (5), irrelevant files (1), misleading premise (1), vague (1), insufficient evidence (2) — plus
@@ -81,6 +81,8 @@ scored as if it were model output.
   cases guard against tuning, not against shared blind spots.
 - Twenty-six cases on three tiny repositories say little about real codebases, and nothing about scale.
 - Keyword scoring both under- and over-credits paraphrase; report it as an approximation.
-- On small repositories a single prompt sees everything, so retrieval cannot differentiate the systems.
-  A fair test of retrieval needs repositories larger than the context budget.
+- On the three original small repositories a single prompt sees everything, so retrieval cannot differentiate
+  the systems there. A fourth, larger fixture (`helpdesk-platform`, ~30,800 characters) now exceeds the
+  24,000-character budget and does get truncated (docs/decisions.md 15) — but it is one repository with four
+  cases, not yet enough to generalise from, and still needs a live-model run to see whether it changes the answer.
 - Live results will vary run to run; report repeated runs before drawing conclusions.

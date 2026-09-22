@@ -36,7 +36,10 @@ Likely suspects, in the order I would check them:
 
 ## 3. Retrieval quality (no key needed, but mind the held-out set)
 
-Current numbers: recall 96% dev / 100% clean held-out v2, precision 57% dev / 48% v2; one dev miss is a vocabulary gap. A dev-only sweep of cheap knobs moved precision about a point (decisions.md 13), so further gains likely need model re-ranking.
+Current numbers: recall 97% dev (17 cases) / 100% clean held-out v2, precision 52% dev / 48% v2 (36% on
+helpdesk-platform alone, the one repo bigger than the retrieval budget — see item 5); one dev miss is a
+vocabulary gap. A dev-only sweep of cheap knobs moved precision about a point (decisions.md 13), so
+further gains likely need model re-ranking.
 
 - Precision: README down-weight is done (0.5, tiny gain);
   pair each source file with its test; cap distractor-prone hops.
@@ -50,12 +53,16 @@ Current numbers: recall 96% dev / 100% clean held-out v2, precision 57% dev / 48
 Implemented (decisions.md 10): answers that introduce new terms can pull in new excerpts, shown as "not yet sent"
 and sent only after a second consent. Still to tune with a live model: whether the two-term threshold is right.
 
-## 5. A benchmark that can actually separate the systems
+## 5. A benchmark that can actually separate the systems — partly done
 
-On three tiny repositories a single prompt sees everything, so retrieval cannot help. Add one or two
-repositories larger than the context budget (pinned commits of small open-source projects), write
-cases against them, and rerun. This is where a staged workflow should either earn its complexity
-or not.
+The fixture side is done: `fixtures/repos/helpdesk-platform` (~30,800 characters, fictional, original)
+exceeds the 24,000-character retrieval budget, with four dev-set cases against it (docs/decisions.md 15).
+Confirmed deterministically: the single-prompt context note now reads "4 of 4 cases were truncated" —
+every other repository has always read "0 of N". **What's still open:** this is one repository, and the
+question the whole benchmark exists to answer — does staged actually produce a better brief than a
+truncated single prompt — needs a live model run against it, which hasn't happened (see item 1/3). A
+second larger fixture, or one pinned from a small real open-source project, would also help generalise
+past a single data point.
 
 ## 6. Product polish
 

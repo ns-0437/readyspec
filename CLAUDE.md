@@ -7,7 +7,7 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 157 tests, production build, and the UI driven
+Milestones 1-5 built and checked: lint, typecheck, 162 tests, production build, and the UI driven
 end to end in a browser. **Gemini (`gemini-3.6-flash`) is validated live** as of 2026-09-22: full
 staged pipeline completed via `npm run smoke:live` and separately through the real browser UI;
 three real schema-compatibility bugs were found from live 400s and fixed (docs/decisions.md 14) —
@@ -91,7 +91,7 @@ long files; prefer the Write/Edit tools for source with regexes.
 - `src/components/` — `Home`, `Workspace`, `TicketPanel`, `EvidenceExplorer` (+ traceability inspector), `BriefPanel`, `ActivityLog`, `Badges`, `api`.
 - `fixtures/demo-repository/` — labelled DEMO TypeScript app (auth, notifications, preferences, tests) with planted secret, binary, generated file, conflicting docs and a prompt-injection doc. Has its own passing tests.
 - `fixtures/repos/{shop-orders,team-tasks}/` — labelled evaluation repos (TypeScript, Python); shop-orders has runnable tests.
-- `evals/` — `cases/*.json` (26 hand-authored: 13 dev, 7 held-out v1 contaminated, 6 held-out v2 clean), `runners/` (schema, score, systems, report, run, cases), `rubrics/human-rubric.md`, `results/`, `REPORT.md`.
+- `evals/` — `cases/*.json` (30 hand-authored: 17 dev [4 against helpdesk-platform, the one fixture larger than the retrieval budget], 7 held-out v1 contaminated, 6 held-out v2 clean), `runners/` (schema, score, systems, report, run, cases), `rubrics/human-rubric.md`, `results/`, `REPORT.md`.
 - `tests/` — Vitest suites (repository safety, search/evidence, LLM layer + mock Anthropic/Gemini servers, verifier, service, API, edit/trace/export, eval scoring/case integrity).
 - `scripts/live-smoke.ts` — live-path smoke test; `.github/workflows/ci.yml` — lint, typecheck, tests, fixture tests, deterministic eval, build.
 - `.env.example` — every supported env var, commented out.

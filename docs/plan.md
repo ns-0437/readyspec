@@ -6,7 +6,7 @@
 3. **Working agent** — done. Provider adapters (Anthropic, Gemini + labelled fixture), budgets/retries/cancel,
    stages, clarification loop, brief generation. Gemini validated live 2026-09-22 (decisions.md 14); Anthropic
    still untested (no key).
-4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 157 tests, 26-case benchmark
+4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 162 tests, 30-case benchmark
    (13 dev, 7 held-out v1 contaminated, 6 held-out v2 clean), runner for three systems. Only deterministic
    results exist (evals/REPORT.md).
 5. **Finish** — README, report, demo script done. Remaining: a live-model run, human scoring, an actual recording.

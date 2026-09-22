@@ -54,7 +54,7 @@ it exists.
 
 ## Other evidence that the system does what it claims (tests, not benchmark)
 
-These are engineering tests (141 in `tests/`), not model-quality evidence:
+These are engineering tests (156 in `tests/`), not model-quality evidence:
 
 - Snapshots exclude secrets, binaries, generated and oversized files, never follow symlinks or
   junctions, and pin content by hash. Traversal and out-of-root paths are rejected.
@@ -91,10 +91,10 @@ These are engineering tests (141 in `tests/`), not model-quality evidence:
 
 ## To complete this report
 
-1. Set `ANTHROPIC_API_KEY` (optionally `READYSPEC_MODEL`, `READYSPEC_PRICE_IN_PER_MTOK`,
+1. Set `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` (optionally `READYSPEC_MODEL`, `READYSPEC_PRICE_IN_PER_MTOK`,
    `READYSPEC_PRICE_OUT_PER_MTOK`).
-2. `npm run eval -- --provider anthropic --set dev`, repeat a few times to see variance.
-3. Freeze the code; run `--set heldout` once.
+2. `npm run eval -- --provider anthropic --set dev` (or `--provider gemini`), repeat a few times to see variance.
+3. Freeze the code; run `--set heldout-v2` once (the only clean cohort left).
 4. Fill the generated `human-scoring-sheet-*.csv` using `evals/rubrics/human-rubric.md`, ideally
    blind and by someone other than the author.
 5. Replace this "not measured" table with the results, keep the failures, and re-read

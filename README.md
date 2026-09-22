@@ -24,10 +24,10 @@ about existing behavior points at code; every proposed change connects to a requ
 
 | Works and is tested | Not done / not validated |
 |---|---|
-| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **The live model path has never run against the real API** (no key at build time). The Anthropic adapter is tested only against a local mock server. |
+| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **The live model path has never run against a real API** (no key at build time). Two adapters exist — Anthropic and Gemini — both tested only against local mock servers. |
 | Read-only snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists.** The harness, 26 cases and human rubric are ready; single-prompt vs staged is unmeasured. |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 146 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
+| 156 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
 | Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
@@ -98,14 +98,20 @@ A 90-second walkthrough is in [docs/demo.md](docs/demo.md).
 
 ### Use a real model
 
+Set a key for **either** provider — Anthropic and Gemini are both supported behind the same
+adapter interface (`LlmProvider`); if both keys are set, Anthropic is used unless
+`READYSPEC_PROVIDER` says otherwise.
+
 ```bash
-export ANTHROPIC_API_KEY=...             # PowerShell: $env:ANTHROPIC_API_KEY = "..."
-npm run smoke:live                       # first-contact check; see docs/live-validation.md
+export ANTHROPIC_API_KEY=...   # or: export GEMINI_API_KEY=...  (GOOGLE_API_KEY also works)
+npm run smoke:live             # first-contact check; see docs/live-validation.md
 npm run dev
 ```
 
+(PowerShell: `$env:ANTHROPIC_API_KEY = "..."` / `$env:GEMINI_API_KEY = "..."`)
+
 The key stays server-side. When a real model is used, the excerpts listed on the consent screen
-(and your ticket) are sent to Anthropic; nothing else from the repository is.
+(and your ticket) are sent to that provider; nothing else from the repository is.
 
 ### Analyse your own repository
 
@@ -118,9 +124,11 @@ Copy `.env.example` to `.env.local`. All optional.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | unset | Enables the live provider |
-| `READYSPEC_PROVIDER` | `anthropic` if a key is set, else `fixture` | Force a provider |
-| `READYSPEC_MODEL` | `claude-sonnet-5` | Model id |
+| `ANTHROPIC_API_KEY` | unset | Enables the Anthropic provider |
+| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | unset | Enables the Gemini provider |
+| `READYSPEC_PROVIDER` | `anthropic` if that key is set, else `gemini` if that key is set, else `fixture` | Force a specific provider |
+| `READYSPEC_MODEL` | `claude-sonnet-5` (Anthropic) / `gemini-2.5-flash` (Gemini) | Model id for whichever provider is selected |
+| `ANTHROPIC_BASE_URL` / `GEMINI_BASE_URL` | provider default | Override the API host (testing only) |
 | `READYSPEC_MAX_CALLS` | 14 | Model calls per session (retries count) |
 | `READYSPEC_MAX_INPUT_TOKENS` / `READYSPEC_MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |
 | `READYSPEC_MAX_COST_USD` | unset | Cost ceiling (needs prices) |
@@ -131,7 +139,8 @@ Copy `.env.example` to `.env.local`. All optional.
 ## Safety model
 
 - **Untrusted input.** Repository text and tickets are fenced as data in prompts, instruction-like
-  text is flagged in the UI, and the model has no tools, so text cannot trigger an action.
+  text is flagged in the UI, and the model has no tools (regardless of provider), so text cannot
+  trigger an action.
 - **Confined reads.** Allowed roots only; symlinks and junctions are never followed; secrets, binaries,
   generated, minified and oversized files are excluded; secret-bearing content is discarded.
 - **Consent.** No model call happens before you have seen the exact excerpts and agreed.
@@ -164,7 +173,7 @@ single prompt is made. Read [evals/REPORT.md](evals/REPORT.md) for the failures,
 src/shared        Zod schemas and pure helpers (trace, edit ops, redaction)
 src/server/
   repository      snapshot, safe file access, symbols, search, evidence
-  llm             provider adapters, prompts, budgets, structured generation
+  llm             provider adapters (Anthropic, Gemini, fixture), prompts, budgets, structured generation
   workflow        stages, verifier, session service, export
   persistence     SQLite store
 src/app/api       thin route handlers
@@ -188,7 +197,7 @@ npm test               # Vitest
 npm run test:fixtures  # the fixture repositories' own tests (node --test)
 npm run check          # lint + typecheck + test
 npm run eval -- --provider fixture --set dev            # benchmark; add --repeat N for variance
-npm run smoke:live                                      # needs ANTHROPIC_API_KEY
+npm run smoke:live                                      # needs ANTHROPIC_API_KEY or GEMINI_API_KEY
 ```
 
 CI runs lint, typecheck, tests, fixture tests, the deterministic benchmark and the build on every push.

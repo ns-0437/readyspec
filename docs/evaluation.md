@@ -64,7 +64,8 @@ alternatives). It is deliberately crude and auditable. The human rubric
 ```
 npm run eval -- --provider fixture --set dev        # no credentials; model-dependent metrics are n/a
 npm run eval -- --provider anthropic --set dev      # needs ANTHROPIC_API_KEY
-npm run eval -- --provider anthropic --set heldout  # once, after freezing the code
+npm run eval -- --provider gemini --set dev         # needs GEMINI_API_KEY (or GOOGLE_API_KEY)
+npm run eval -- --provider anthropic --set heldout-v2  # once, after freezing the code (v1 is contaminated, see decisions.md 13)
 ```
 
 Options: `--systems checklist,single,staged`, `--cases id,id`, `--set dev|heldout|heldout-v2|all`.

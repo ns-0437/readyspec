@@ -4,10 +4,11 @@
    interface was built against the real API rather than as a mock; see decisions.md 11.)
 2. **Repository intelligence** — done. Safe fs, filters, snapshots, symbol-aware lexical search, evidence + validation.
 3. **Working agent** — done with the fixture provider; live path implemented, not validated. Provider adapter
-   (Anthropic + labelled fixture), budgets/retries/cancel, stages, clarification loop, brief generation.
-4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 139 tests, 20-case benchmark,
-   runner for three systems. Only deterministic results exist (evals/REPORT.md).
+   (Anthropic, Gemini + labelled fixture), budgets/retries/cancel, stages, clarification loop, brief generation.
+4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 156 tests, 26-case benchmark
+   (13 dev, 7 held-out v1 contaminated, 6 held-out v2 clean), runner for three systems. Only deterministic
+   results exist (evals/REPORT.md).
 5. **Finish** — README, report, demo script done. Remaining: a live-model run, human scoring, an actual recording.
 
-Next: get an API key, run `npm run eval -- --provider anthropic --set dev`, fix the biggest weakness it exposes,
-run the held-out set once, then update evals/REPORT.md.
+Next: get an API key (Anthropic or Gemini), run `npm run eval -- --provider anthropic --set dev` (or
+`--provider gemini`), fix the biggest weakness it exposes, run `--set heldout-v2` once, then update evals/REPORT.md.

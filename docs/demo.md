@@ -5,7 +5,7 @@ implementation, with code-backed evidence and a benchmark against simpler approa
 
 Prep: `npm run dev`, open http://localhost:3000. With no API key the app runs the fixture provider
 and says so in a banner. Say so in the recording too: the demo shows the product and its
-guardrails, not model quality. If you have a key, set `ANTHROPIC_API_KEY` first and the same flow
+guardrails, not model quality. If you have a key, set `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` first and the same flow
 runs against the real model (not yet validated by the author; see README).
 
 | Time | Do | Say |

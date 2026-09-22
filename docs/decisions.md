@@ -87,3 +87,20 @@ declared contaminated and v2 is the clean estimate. A dev-only sweep (README dow
 hop cap) moved precision by about one point; only the README down-weight (0.5) was kept. Disabling the reference and
 definition hops raised dev precision to 62% but cut recall from 96% to 87%, so they stay. Clean v2 result: recall 100%,
 precision 48% (dev 57%), i.e. the dev number was optimistic. Further gains likely need model re-ranking, which needs a key.
+
+## 14. A second provider (Gemini), added because a key became available for it before Anthropic
+`GeminiProvider` mirrors `AnthropicProvider`: same `LlmProvider` interface, `fetch`-only, same error
+classification (429/5xx retryable, other 4xx not, malformed/empty response is a `ProviderError`,
+caller abort maps to `CancelledError`), same key-redaction discipline. The structured-output
+mechanism differs: Gemini has no "forced tool call" primitive, so it uses
+`generationConfig.responseMimeType: "application/json"` with a `responseSchema` derived from the
+same Zod-generated JSON Schema Anthropic gets as a tool's `input_schema`. Gemini's schema support
+is a restricted OpenAPI-3.0 subset, not full JSON Schema, so `toGeminiSchema` strips keywords it is
+documented not to accept (`$schema`, `additionalProperties`, `$ref`, `const`, `examples`, `title`)
+before sending it. **Not validated against the live API** (no credentials were available for either
+provider when this was built) — covered the same way Anthropic is, by a mock-server test asserting
+request shape, response parsing, error classification and that the key never leaks into a surfaced
+error. `createProvider()` treats the two symmetrically: an explicit `READYSPEC_PROVIDER` always
+wins and errors loudly if that provider's key is missing (never a silent fallback); with no
+explicit choice, Anthropic is preferred when both keys are set, purely so the selection is a fixed,
+documented rule rather than "whichever env var happens to be read first".

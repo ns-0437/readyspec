@@ -114,7 +114,23 @@ providers see only the rendered prompt.
 
 ## Provider layer
 
-`LlmProvider.complete(request) -> { text, usage }`. `AnthropicProvider` uses `fetch` against the
-Messages API and forces a single tool call whose input schema is the stage's JSON Schema.
-`FixtureProvider` is scripted for the demonstration ticket and mechanical otherwise; it is
-labelled in the UI, the brief (`producedBy`), exports and evaluation reports.
+`LlmProvider.complete(request) -> { text, usage }`. Three implementations, selected by
+`createProvider()` (`src/server/llm/index.ts`) from env vars; a session pins whichever one was
+selected at creation (`service.ts` refuses to continue a job if the provider changes underneath it):
+
+- `AnthropicProvider` — `fetch` against the Messages API; forces a single tool call whose input
+  schema is the stage's JSON Schema (`tool_choice: {type: "tool", ...}`).
+- `GeminiProvider` — `fetch` against `generateContent`; requests JSON directly via
+  `generationConfig.responseMimeType: "application/json"` + `responseSchema` (Gemini's structured
+  output has no separate "forced tool" step). The schema is passed through `toGeminiSchema`, which
+  drops JSON Schema keywords (`$schema`, `additionalProperties`, `$ref`, ...) that Gemini's
+  restricted OpenAPI-subset schema does not accept.
+- `FixtureProvider` — scripted for the demonstration ticket and mechanical otherwise; it is
+  labelled in the UI, the brief (`producedBy`), exports and evaluation reports.
+
+Both real adapters share the same shape of error handling: the API key goes in a header (never the
+URL or logs), 429/5xx are retryable, other 4xx are not, a malformed or contentless response is a
+`ProviderError`, and a caller-aborted `AbortSignal` becomes `CancelledError`. Neither has been
+exercised against its real API (see README status); both are covered by tests against a local mock
+HTTP server (`tests/llm.test.ts`) that check request shape, response parsing, error classification
+and that the API key is never echoed back in a surfaced error message.

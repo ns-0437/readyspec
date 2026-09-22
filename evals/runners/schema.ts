@@ -12,7 +12,7 @@ const AnyOf = z.array(Group).min(1);
 
 export const EvalCase = z.object({
   id: z.string(),
-  repo: z.enum(["demo-repository", "shop-orders", "team-tasks"]),
+  repo: z.enum(["demo-repository", "shop-orders", "team-tasks", "helpdesk-platform"]),
   ticket: z.string(),
   category: z.enum(["clear", "ambiguous", "conflicting-docs", "irrelevant-files", "misleading", "vague", "insufficient-evidence"]),
   heldOut: z.boolean(),

@@ -2,19 +2,19 @@
 
 > **Fixture provider run.** No language model produced any output here. Metrics that depend on model output are marked n/a. The static-checklist column and the staged workflow's retrieval columns are real (deterministic). Do not read this as a model-quality result.
 
-Cases: 13 (0 held out). Generated 2026-09-21T15:05:27.252Z.
+Cases: 17 (0 held out). Generated 2026-09-22T15:22:56.715Z.
 
 | Metric | Static checklist | Single prompt | ReadySpec staged |
 |---|---|---|---|
-| Required-file recall (retrieval) | 0% | n/a (fixture) | 96% |
-| Precision of files used | n/a | n/a (fixture) | 57% |
-| Distractor files used / case | 0.00 | n/a (fixture) | 0.54 |
+| Required-file recall (retrieval) | 0% | n/a (fixture) | 97% |
+| Precision of files used | n/a | n/a (fixture) | 52% |
+| Distractor files used / case | 0.00 | n/a (fixture) | 0.71 |
 | Citation validity | n/a | n/a (fixture) | n/a (fixture) |
 | Observed claims supported by cited code | n/a | n/a (fixture) | n/a (fixture) |
-| Critical ambiguities asked | 3% | n/a (fixture) | n/a (fixture) |
-| Critical ambiguities surfaced anywhere | 3% | n/a (fixture) | n/a (fixture) |
+| Critical ambiguities asked | 2% | n/a (fixture) | n/a (fixture) |
+| Critical ambiguities surfaced anywhere | 2% | n/a (fixture) | n/a (fixture) |
 | Questions / case | 5.0 | n/a (fixture) | n/a (fixture) |
-| Unnecessary question rate | 98% | n/a (fixture) | n/a (fixture) |
+| Unnecessary question rate | 99% | n/a (fixture) | n/a (fixture) |
 | Expected contradictions noticed | 0% | n/a (fixture) | n/a (fixture) |
 | Insufficient evidence acknowledged | 0% | n/a (fixture) | n/a (fixture) |
 | Unacceptable assumptions (count) | 0 | n/a (fixture) | n/a (fixture) |
@@ -26,7 +26,7 @@ Cases: 13 (0 held out). Generated 2026-09-21T15:05:27.252Z.
 | Cost (USD, needs READYSPEC_PRICE_*) | n/a | n/a (fixture) | n/a (fixture) |
 | Failed cases (system error) | 0 | n/a (fixture) | 0 |
 
-Single-prompt baseline context: 0 of 13 cases were truncated to the 24000-character budget; otherwise it saw the whole repository (so retrieval gives ReadySpec no advantage on small repositories).
+Single-prompt baseline context: 4 of 17 cases were truncated to the 24000-character budget; otherwise it saw the whole repository (so retrieval gives ReadySpec no advantage on small repositories).
 
 ## Per-case detail (staged workflow and checklist)
 
@@ -44,6 +44,14 @@ Single-prompt baseline context: 0 of 13 cases were truncated to the 24000-charac
 | demo-07-unread-count |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
 | demo-08-rename-marketing |  | Static checklist | 0% | src/notifications/types.ts, src/users/preferences.ts, src/notifications/dispatcher.ts | 0/2 | stored-data, api-compat | 5 | - | - |
 | demo-08-rename-marketing |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
+| helpdesk-01-sla-breach-warning |  | Static checklist | 0% | src/tickets/ticket.ts, src/sla/clock.ts, src/notifications/digest.ts | 0/3 | first-response-unused, realtime-vs-digest, threshold | 5 | - | - |
+| helpdesk-01-sla-breach-warning |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
+| helpdesk-02-survey-optout |  | Static checklist | 0% | src/surveys/csat.ts, src/tickets/ticket.ts | 0/3 | no-preference-model, scope, who-can-set-it | 5 | - | - |
+| helpdesk-02-survey-optout |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
+| helpdesk-03-custom-field-export |  | Static checklist | 0% | src/fields/custom-fields.ts, src/tickets/ticket.ts | 0/3 | which-fields, permission, no-export-today | 5 | - | - |
+| helpdesk-03-custom-field-export |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
+| helpdesk-04-round-robin-bug |  | Static checklist | 0% | src/agents/assignment.ts | 0/2 | reproduction, capacity-or-availability-explanation | 5 | - | 0/1 |
+| helpdesk-04-round-robin-bug |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
 | shop-01-partial-refunds |  | Static checklist | 0% | src/orders/refunds.ts, src/orders/order.ts | 0/4 | amount-or-items, tax-and-discount, restock, cumulative-limit | 5 | - | - |
 | shop-01-partial-refunds |  | ReadySpec staged | 100% | - | n/a | n/a | n/a | n/a | n/a |
 | shop-02-stack-coupons |  | Static checklist | 0% | src/orders/discounts.ts, src/orders/pricing.ts, src/orders/checkout.ts | 0/4 | application-order, combination-rules, cap, data-model | 5 | - | - |

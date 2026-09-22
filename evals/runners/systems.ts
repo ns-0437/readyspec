@@ -19,6 +19,7 @@ const REPO_PATH: Record<EvalCase["repo"], string> = {
   "demo-repository": path.join(ROOT, "demo-repository"),
   "shop-orders": path.join(ROOT, "repos", "shop-orders"),
   "team-tasks": path.join(ROOT, "repos", "team-tasks"),
+  "helpdesk-platform": path.join(ROOT, "repos", "helpdesk-platform"),
 };
 
 const snapshots = new Map<string, Snapshot>();

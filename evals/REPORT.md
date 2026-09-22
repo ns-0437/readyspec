@@ -14,7 +14,8 @@ the UI validation. Do not read "the live path works" as "the numbers below are v
 still are not. Method: [docs/evaluation.md](../docs/evaluation.md).
 
 Run: 2026-09-21, fixture provider (no language model), `npm run eval -- --provider fixture`.
-26 cases in three groups: **development** (13, used to tune retrieval), **held-out v1** (7, run once before the
+30 cases in three groups: **development** (17, used to tune retrieval; 4 of them against a fourth fixture,
+helpdesk-platform, sized to exceed the retrieval budget — see docs/decisions.md 15), **held-out v1** (7, run once before the
 tuning below, so no longer clean) and **held-out v2** (6, written before the tuning and run once after it).
 
 ## What was measured (real, deterministic)
@@ -23,11 +24,16 @@ tuning below, so no longer clean) and **held-out v2** (6, written before the tun
 
 | Set | Cases | Required-file recall | Precision (required + helpful) | Distractor files / case |
 |---|---|---|---|---|
-| Development | 13 | 96% | 57% | 0.54 |
+| Development (13 original) | 13 | 96% | 57% | 0.54 |
+| Development (17, incl. helpdesk-platform) | 17 | 97% | 52% | 0.71 |
+| — of which helpdesk-platform alone | 4 | 100% | 36% | 1.25 |
 | Held-out v1 (contaminated: rerun after tuning) | 7 | 100% | 59% | 0.57 |
 | **Held-out v2 (clean, run once)** | 6 | 100% | **48%** | 0.67 |
 
-Per case, only one required file was missed in 26 cases: `src/api/routes.ts` for
+Precision drops and distractors rise on the larger, more varied repository, as expected; recall stays perfect.
+Held-out sets were frozen before helpdesk-platform existed and are unaffected by it.
+
+Per case, only one required file was missed across the original 26 cases (helpdesk-platform's 4 new cases all hit 100% recall): `src/api/routes.ts` for
 `demo-05-admin-skipped-log` ("Let admins see which notifications were skipped..."). The ticket shares
 no vocabulary with that file; lexical retrieval cannot find it. Every other required file was retrieved.
 

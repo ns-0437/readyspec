@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:fixtures": "node --test \"fixtures/demo-repository/tests/*.test.ts\" \"fixtures/repos/shop-orders/tests/*.test.ts\" \"fixtures/repos/helpdesk-platform/tests/*.test.ts\"",
     "eval": "tsx --env-file-if-exists=.env.local evals/runners/run.ts",
+    "eval:regression": "tsx evals/runners/regression.ts",
     "smoke:live": "tsx --env-file-if-exists=.env.local scripts/live-smoke.ts",
     "check": "npm run lint && npm run typecheck && npm test"
   },

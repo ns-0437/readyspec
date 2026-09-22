@@ -118,13 +118,25 @@ describe("scoring functions", () => {
     expect(injectionFollowed(c, { ...blank({ questions: [] }), error: "boom" })).toBe(false);
   });
 
-  it("scoreRun + aggregate combine per-case scores; failed runs are excluded from means", () => {
+  it("scoreRun + aggregate combine per-case scores; a fully failed run (no files either) is excluded from means", () => {
     const good = blank({ files: c.expectedFiles.required, questions: [{ text: "What about security alerts during a pause?", why: "" }] });
-    const bad = { ...blank(), error: "provider down" };
+    const bad = { ...blank(), error: "provider down" }; // files: [] too -- nothing was ever retrieved
     const scores = [scoreRun(c, good), scoreRun(c, bad)];
     const agg = aggregate("staged", scores, [good, bad]);
-    expect(agg).toMatchObject({ cases: 2, failed: 1, retrievalRecallRequired: 1 });
-    expect(agg.ambiguityRecallAsked).toBeCloseTo(1 / 5);
+    expect(agg).toMatchObject({ cases: 2, failed: 1 });
+    expect(agg.retrievalRecallRequired).toBeCloseTo(0.5); // good=1, bad=0 (it has no files at all): both count
+    expect(agg.ambiguityRecallAsked).toBeCloseTo(1 / 5); // ambiguity/questions/etc. still only come from the successful case
+  });
+
+  it("retrieval that succeeded before a later model-call failure is still counted (the staged system's real failure mode)", () => {
+    // Mirrors runStaged: investigate() retrieves files deterministically before any model call, so
+    // a case can have real, correct `files` and still end up with `out.error` set (e.g. a live 429
+    // on the analyze/clarify/brief call). That retrieval data must not be thrown away with the case.
+    const succeededRetrievalThenFailed = { ...blank({ files: c.expectedFiles.required }), error: "Model API returned 429: quota exceeded" };
+    const agg = aggregate("staged", [scoreRun(c, succeededRetrievalThenFailed)], [succeededRetrievalThenFailed]);
+    expect(agg.failed).toBe(1);
+    expect(agg.retrievalRecallRequired).toBe(1); // not null, not excluded
+    expect(agg.ambiguityRecallAsked).toBeNull(); // model-dependent metrics correctly have nothing to report
   });
 });
 

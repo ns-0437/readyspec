@@ -222,13 +222,20 @@ export function aggregate(system: SystemName, scores: CaseScore[], outputs: Syst
   const contra = ok.filter((s) => s.contradictions.applicable);
   const insuff = ok.filter((s) => s.insufficientAcknowledged !== null);
   const costs = okOut.map((o) => o.usage.costUsd);
+  // Retrieval is a deterministic pre-model step for the staged system (investigate() runs before
+  // any model call; see systems.ts runStaged), so a case whose LATER model call failed still has
+  // real, meaningful retrieval data -- gating these three metrics on `failed` like everything else
+  // silently discarded that data (seen live: every model call failed on a quota limit, and the
+  // aggregate table printed "n/a" for retrieval even though all 13 cases had retrieved real,
+  // correct files). For single_prompt, `files` comes FROM the model's citations, so a failed case
+  // genuinely has none; scoring it as 0 recall (not excluding it) is the honest reflection of that.
   return {
     system,
     cases: scores.length,
     failed: scores.length - ok.length,
-    retrievalRecallRequired: mean(ok.map((s) => s.retrieval.recallRequired)),
-    retrievalPrecision: mean(ok.filter((s) => s.retrieval.fileCount > 0).map((s) => s.retrieval.precision)),
-    distractorFilesPerCase: mean(ok.map((s) => s.retrieval.distractorHits.length)),
+    retrievalRecallRequired: mean(scores.map((s) => s.retrieval.recallRequired)),
+    retrievalPrecision: mean(scores.filter((s) => s.retrieval.fileCount > 0).map((s) => s.retrieval.precision)),
+    distractorFilesPerCase: mean(scores.map((s) => s.retrieval.distractorHits.length)),
     citationValidity: cited ? ok.reduce((s, x) => s + x.evidence.citationsValid, 0) / cited : null,
     observationsSupportedRate: obsTotal ? ok.reduce((s, x) => s + x.evidence.supported, 0) / obsTotal : null,
     ambiguityRecallAsked: mean(ok.map((s) => s.ambiguity.recallAsked)),

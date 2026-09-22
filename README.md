@@ -198,10 +198,13 @@ npm test               # Vitest
 npm run test:fixtures  # the fixture repositories' own tests (node --test)
 npm run check          # lint + typecheck + test
 npm run eval -- --provider fixture --set dev            # benchmark; add --repeat N for variance
+npm run eval:regression                                 # deterministic retrieval-only check vs. evals/baseline-retrieval.json
 npm run smoke:live                                      # needs ANTHROPIC_API_KEY or GEMINI_API_KEY
 ```
 
 CI runs lint, typecheck, tests, fixture tests, the deterministic benchmark and the build on every push.
+A separate workflow checks for retrieval regressions weekly and on PRs that touch retrieval code
+(`.github/workflows/retrieval-regression.yml`); Dependabot proposes dependency updates weekly.
 
 ## Roadmap
 

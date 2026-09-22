@@ -4,7 +4,7 @@ import { FixtureProvider } from "./fixture";
 import type { LlmProvider } from "./provider";
 
 export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 
 /**
  * Provider selection (server-side only; keys never reach the browser):

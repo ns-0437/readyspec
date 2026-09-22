@@ -26,15 +26,32 @@ export interface GeminiOptions {
 /**
  * Strip JSON Schema keywords Gemini's `responseSchema` does not accept (it takes a restricted
  * OpenAPI-3.0-style subset, not full JSON Schema). Unknown keys are dropped rather than causing
- * a 400; this is best-effort and has not been checked against the live API (see docs/decisions.md).
+ * a 400. Every entry here was hit live against gemini-3.6-flash on the app's own schemas and
+ * confirmed by the exact 400 message (see docs/decisions.md 14) — `propertyNames` and
+ * `additionalProperties` (both from Zod's `z.record`) and `const` (from a literal-valued field)
+ * are each rejected by name with "Cannot find field". Losing `additionalProperties` means an
+ * object typed via `z.record` degrades to an untyped `{"type":"object"}` for this provider: the
+ * model can still return arbitrary key/value pairs, just without a declared value type.
+ *
+ * Separately (also hit live, different error: "Proto field is not repeating, cannot start
+ * list."): Zod renders a `.nullable()` field as JSON Schema 2020-12's `"type": ["string",
+ * "null"]`, but Gemini's Schema proto wants a single scalar `type` plus OpenAPI-style
+ * `nullable: true`. That translation happens below.
  */
 function toGeminiSchema(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(toGeminiSchema);
   if (schema === null || typeof schema !== "object") return schema;
-  const DROP = new Set(["$schema", "additionalProperties", "$ref", "const", "examples", "title"]);
+  const DROP = new Set(["$schema", "$ref", "propertyNames", "additionalProperties", "const"]);
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
     if (DROP.has(k)) continue;
+    if (k === "type" && Array.isArray(v)) {
+      const types = v as unknown[];
+      const nonNull = types.find((t) => t !== "null");
+      out.type = nonNull ?? types[0];
+      if (types.includes("null")) out.nullable = true;
+      continue;
+    }
     out[k] = toGeminiSchema(v);
   }
   return out;
@@ -78,6 +95,13 @@ export class GeminiProvider implements LlmProvider {
             maxOutputTokens: req.maxOutputTokens,
             responseMimeType: "application/json",
             responseSchema: toGeminiSchema(req.jsonSchema),
+            // Reasoning models (e.g. gemini-3.x) spend hidden "thinking" tokens out of the same
+            // maxOutputTokens budget before writing the answer; verified live that a stage-sized
+            // budget (a few hundred to a few thousand tokens) can be exhausted entirely by
+            // thinking, leaving finishReason: MAX_TOKENS and no JSON at all. We need reliable
+            // structured output, not open-ended reasoning, so thinking is switched off. Ignored
+            // (harmlessly) by models that don't support it.
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       });

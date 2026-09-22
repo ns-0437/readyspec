@@ -281,7 +281,21 @@ describe("GeminiProvider (mock HTTP server)", () => {
   });
   afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
-  const req = (): LlmRequest => ({ stage: "analyze", system: "SYS", user: "USER", schemaName: "T", jsonSchema: { type: "object", properties: { n: { type: "number" } }, additionalProperties: false, $schema: "x" }, maxOutputTokens: 123 });
+  const req = (): LlmRequest => ({
+    stage: "analyze", system: "SYS", user: "USER", schemaName: "T",
+    jsonSchema: {
+      type: "object",
+      properties: {
+        n: { type: "number" },
+        kind: { type: "string", const: "observed" },
+        notes: { type: "object", propertyNames: { type: "string" }, additionalProperties: { type: "string" } },
+        testPath: { type: ["string", "null"] },
+      },
+      $schema: "x",
+      $ref: "#/x",
+    },
+    maxOutputTokens: 123,
+  });
   const provider = () => new GeminiProvider({ apiKey: KEY, model: "gemini-test", baseUrl: base });
 
   it("sends the key in a header (not the URL), requests JSON with a schema, and parses usage", async () => {
@@ -292,17 +306,30 @@ describe("GeminiProvider (mock HTTP server)", () => {
     expect(last!.headers["x-goog-api-key"]).toBe(KEY);
     expect(last!.url).not.toContain(KEY);
     expect(last!.url).toContain("gemini-test:generateContent");
-    expect(last!.body).toMatchObject({ generationConfig: { maxOutputTokens: 123, responseMimeType: "application/json" } });
+    expect(last!.body).toMatchObject({ generationConfig: { maxOutputTokens: 123, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } } });
     expect(last!.body.systemInstruction).toEqual({ role: "system", parts: [{ text: "SYS" }] });
     expect(JSON.stringify(last!.body)).not.toContain(KEY);
   });
 
-  it("strips JSON Schema keywords the API does not accept from responseSchema", async () => {
+  it("strips propertyNames/additionalProperties/$schema/$ref/const, all confirmed rejected live by exact name", async () => {
     mode = "ok";
     await provider().complete(req());
     const schema = (last!.body.generationConfig as { responseSchema: Record<string, unknown> }).responseSchema;
-    expect(schema).not.toHaveProperty("additionalProperties");
     expect(schema).not.toHaveProperty("$schema");
+    expect(schema).not.toHaveProperty("$ref");
+    const notes = (schema.properties as Record<string, Record<string, unknown>>).notes!;
+    expect(notes).not.toHaveProperty("propertyNames");
+    expect(notes).not.toHaveProperty("additionalProperties");
+    expect(notes).toEqual({ type: "object" });
+    expect((schema.properties as Record<string, Record<string, unknown>>).kind).not.toHaveProperty("const");
+  });
+
+  it("translates a JSON-Schema-2020-12 nullable ([\"string\",\"null\"]) into OpenAPI-style {type, nullable:true} (Gemini rejected the array form live with a proto error)", async () => {
+    mode = "ok";
+    await provider().complete(req());
+    const schema = (last!.body.generationConfig as { responseSchema: Record<string, unknown> }).responseSchema;
+    const testPath = (schema.properties as Record<string, Record<string, unknown>>).testPath!;
+    expect(testPath).toEqual({ type: "string", nullable: true });
     expect(schema).toMatchObject({ type: "object" });
   });
 

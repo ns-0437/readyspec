@@ -11,8 +11,13 @@ export const SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
   { name: "slack-token", regex: /\bxox[abprs]-[A-Za-z0-9-]{10,}/ },
   { name: "jwt", regex: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
   {
+    // A bounded prefix is allowed before the keyword (db_password, STRIPE_CLIENT_SECRET,
+    // my_api_key): a bare \b sat directly before the keyword, so it never matched inside an
+    // identifier -- the most common real-world config/env-var shape. The keyword may also be
+    // followed by a closing quote before the separator ("password": "...") to match JSON, which
+    // is how ticket bodies and file contents actually carry these.
     name: "credential-assignment",
-    regex: /\b(?:api[_-]?key|secret|passwd|password|access[_-]?token|auth[_-]?token)\b\s*[:=]\s*["']?[A-Za-z0-9/+_.-]{16,}/i,
+    regex: /\b[A-Za-z0-9_-]{0,40}?(?:api[_-]?key|secret|passwd|password|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["']?[A-Za-z0-9/+_.-]{16,}/i,
   },
 ];
 

@@ -336,7 +336,7 @@ export class SessionService {
     this.store.log(id, "brief", "info", `Brief revision ${brief.revision}: ${brief.acceptanceCriteria.length} criteria, ${brief.components.length} components, ${brief.tests.length} tests, ${brief.openQuestions.length} open question(s).`);
 
     let modelSupport: SupportResult[] | undefined;
-    if (env.provider.info.kind === "anthropic") {
+    if (env.provider.info.kind !== "fixture") {
       try {
         const evById = new Map(evidence.map((e) => [e.id, e]));
         const items = [

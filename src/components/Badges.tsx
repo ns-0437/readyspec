@@ -61,7 +61,7 @@ export function FixtureBanner({ provider }: { provider: ProviderInfo }) {
   return (
     <div className="banner" role="note">
       <strong>Fixture provider.</strong> Analysis, questions and briefs are scripted output written for the demonstration, not results from a language model.
-      Set <code>ANTHROPIC_API_KEY</code> to run against a real model.
+      Set <code>ANTHROPIC_API_KEY</code> or <code>GEMINI_API_KEY</code> to run against a real model.
     </div>
   );
 }

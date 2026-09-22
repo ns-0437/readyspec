@@ -76,7 +76,11 @@ past a single data point.
 
 - Replace regex symbol extraction with tree-sitter for TS/JS/Python.
 - Move snapshot creation off the request thread (worker) for large repositories.
-- Dependabot, and a scheduled workflow that runs the deterministic benchmark to catch retrieval regressions.
+- ✅ Dependabot, and a scheduled workflow that runs a deterministic retrieval-regression check —
+  done: `.github/dependabot.yml`, `.github/workflows/retrieval-regression.yml`,
+  `evals/runners/regression.ts` (`npm run eval:regression`). Checks retrieval only (recall,
+  precision, distractor rate against `evals/baseline-retrieval.json`), since that's the
+  deterministic, key-free part; it says nothing about clarification or brief quality.
 - Move off `node:sqlite` if it stays experimental for long.
 
 ## Explicitly not next

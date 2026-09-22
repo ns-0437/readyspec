@@ -94,6 +94,7 @@ long files; prefer the Write/Edit tools for source with regexes.
 - `evals/` — `cases/*.json` (30 hand-authored: 17 dev [4 against helpdesk-platform, the one fixture larger than the retrieval budget], 7 held-out v1 contaminated, 6 held-out v2 clean), `runners/` (schema, score, systems, report, run, cases), `rubrics/human-rubric.md`, `results/`, `REPORT.md`.
 - `tests/` — Vitest suites (repository safety, search/evidence, LLM layer + mock Anthropic/Gemini servers, verifier, service, API, edit/trace/export, eval scoring/case integrity).
 - `scripts/live-smoke.ts` — live-path smoke test; `.github/workflows/ci.yml` — lint, typecheck, tests, fixture tests, deterministic eval, build.
+- `evals/runners/regression.ts` + `evals/baseline-retrieval.json` — deterministic retrieval-regression check (`npm run eval:regression`); `.github/workflows/retrieval-regression.yml` runs it weekly + on PRs touching retrieval; `.github/dependabot.yml` — weekly npm/actions updates (zod majors excluded, see decisions.md 14).
 - `.env.example` — every supported env var, commented out.
 - `docs/` — product, architecture, decisions, evaluation, demo (90-second script), live-validation, roadmap, plan.
 
@@ -109,6 +110,7 @@ npm run test:fixtures  # node --test on the demo + shop-orders fixtures' own tes
 npm run check          # lint + typecheck + test
 npm run build          # production build
 npm run eval -- --provider fixture --set dev   # benchmark; --repeat N for variance; --set heldout-v2 ONCE after code freeze (v1 is contaminated)
+npm run eval:regression                        # deterministic retrieval-only regression check against evals/baseline-retrieval.json
 npm run smoke:live     # first-contact live check (needs ANTHROPIC_API_KEY or GEMINI_API_KEY); see docs/live-validation.md
 ```
 

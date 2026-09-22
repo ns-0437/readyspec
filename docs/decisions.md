@@ -95,12 +95,42 @@ caller abort maps to `CancelledError`), same key-redaction discipline. The struc
 mechanism differs: Gemini has no "forced tool call" primitive, so it uses
 `generationConfig.responseMimeType: "application/json"` with a `responseSchema` derived from the
 same Zod-generated JSON Schema Anthropic gets as a tool's `input_schema`. Gemini's schema support
-is a restricted OpenAPI-3.0 subset, not full JSON Schema, so `toGeminiSchema` strips keywords it is
-documented not to accept (`$schema`, `additionalProperties`, `$ref`, `const`, `examples`, `title`)
-before sending it. **Not validated against the live API** (no credentials were available for either
-provider when this was built) — covered the same way Anthropic is, by a mock-server test asserting
-request shape, response parsing, error classification and that the key never leaks into a surfaced
-error. `createProvider()` treats the two symmetrically: an explicit `READYSPEC_PROVIDER` always
-wins and errors loudly if that provider's key is missing (never a silent fallback); with no
-explicit choice, Anthropic is preferred when both keys are set, purely so the selection is a fixed,
-documented rule rather than "whichever env var happens to be read first".
+is a restricted OpenAPI-3.0 subset, not full JSON Schema, so `toGeminiSchema` strips or translates
+keywords it rejects. `createProvider()` treats the two providers symmetrically: an explicit
+`READYSPEC_PROVIDER` always wins and errors loudly if that provider's key is missing (never a
+silent fallback); with no explicit choice, Anthropic is preferred when both keys are set, purely so
+the selection is a fixed, documented rule rather than "whichever env var happens to be read first".
+
+**Update, same day: validated live against `gemini-3.6-flash` (Anthropic still untested — no key).**
+The first three attempts each failed with a different, specific 400 from the real API, none of
+which the mock-server tests (built from documentation-level guesses, not real responses) had
+caught — a direct demonstration of why "not validated against the live API" was in the status table
+in the first place. Each was fixed from the exact error message, not guessed, then re-tested live:
+1. `Unknown name "propertyNames" ... Cannot find field` — Zod's `z.record` (`evidenceNotes`) emits
+   `propertyNames`; Gemini's schema doesn't have it. Dropped.
+2. `Unknown name "additionalProperties" ... Cannot find field` — also from `z.record`, and also
+   unsupported (reverses the original guess that it was needed and accepted). Dropped; a
+   `z.record`-typed field degrades to an untyped `{"type":"object"}` for this provider only.
+3. `Unknown name "type" ... Proto field is not repeating, cannot start list` — Zod renders
+   `.nullable()` as JSON Schema 2020-12's `"type": ["string","null"]`; Gemini's Schema proto wants
+   a single scalar `type` and a separate `nullable: true`. Now translated.
+4. Separately (not an error, a silent failure mode): `gemini-3.6-flash` is a reasoning model that
+   spends hidden "thinking" tokens out of the same `maxOutputTokens` budget before writing the
+   answer. At a stage-sized budget it burned the whole budget thinking and returned
+   `finishReason: MAX_TOKENS` with no text at all — `extractJson` correctly saw this as "no JSON
+   found" and retried, but every retry would have failed the same way. Fixed by sending
+   `thinkingConfig: { thinkingBudget: 0 }`; the tests and code both explain why.
+
+With all four fixed, `npm run smoke:live` completed the full staged pipeline (analyze, clarify,
+brief, verify) end to end, 3 calls, 0 invalid citations, and it correctly identified the
+`docs/notifications.md` vs `decideDelivery` contradiction that's built into the demo fixture. A
+second run driven through the actual browser UI (not the CLI script) got through investigate,
+disclosure, consent, analyze and clarify — the questions were specific to the code (not generic),
+and the model did not follow the planted `docs/AGENT_NOTES.md` prompt-injection text — then hit a
+real `429` quota-exceeded on the brief call (the account's free-tier limit, not a code defect);
+the app classified it as recoverable, kept all 3 decisions and 17 evidence items, and offered
+**Resume**, exactly as designed. This is real evidence the reliability machinery
+(retry/backoff/recoverable-failure/resume) works under a genuine live failure, not just a
+scripted mock. **What this does not yet cover:** the model-dependent benchmark (`npm run eval`)
+has not been run — that's dozens of calls and would need the quota to reset first — and Anthropic
+remains completely unvalidated. See `evals/REPORT.md`.

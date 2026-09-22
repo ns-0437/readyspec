@@ -24,10 +24,10 @@ about existing behavior points at code; every proposed change connects to a requ
 
 | Works and is tested | Not done / not validated |
 |---|---|
-| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **The live model path has never run against a real API** (no key at build time). Two adapters exist — Anthropic and Gemini — both tested only against local mock servers. |
-| Read-only snapshots; pinned, content-addressed evidence | **No model-quality benchmark result exists.** The harness, 26 cases and human rubric are ready; single-prompt vs staged is unmeasured. |
+| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **Anthropic has never run against a real API** (no key). Only tested against a local mock server. |
+| **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | **No model-quality benchmark result exists yet.** The harness, 26 cases and human rubric are ready; `npm run eval` against a real provider has not been run (needs dozens of calls) |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 156 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
+| 157 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 48-57% |
 | Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
@@ -127,7 +127,7 @@ Copy `.env.example` to `.env.local`. All optional.
 | `ANTHROPIC_API_KEY` | unset | Enables the Anthropic provider |
 | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | unset | Enables the Gemini provider |
 | `READYSPEC_PROVIDER` | `anthropic` if that key is set, else `gemini` if that key is set, else `fixture` | Force a specific provider |
-| `READYSPEC_MODEL` | `claude-sonnet-5` (Anthropic) / `gemini-2.5-flash` (Gemini) | Model id for whichever provider is selected |
+| `READYSPEC_MODEL` | `claude-sonnet-5` (Anthropic) / `gemini-3.6-flash` (Gemini) | Model id for whichever provider is selected |
 | `ANTHROPIC_BASE_URL` / `GEMINI_BASE_URL` | provider default | Override the API host (testing only) |
 | `READYSPEC_MAX_CALLS` | 14 | Model calls per session (retries count) |
 | `READYSPEC_MAX_INPUT_TOKENS` / `READYSPEC_MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |

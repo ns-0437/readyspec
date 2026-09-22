@@ -1,7 +1,10 @@
 # Live validation checklist
 
-Two model adapters are implemented and unit-tested against local mock servers, but neither has
-ever talked to a real API. Do this once, per provider you care about, and write down what you find.
+Two model adapters exist. **Gemini (`gemini-3.6-flash`) was validated live on 2026-09-22** — steps
+1 and 2 below both passed; three real schema bugs were found and fixed along the way (see
+`docs/decisions.md` item 14; the "If you see" table below still documents them for future models).
+**Anthropic has never talked to a real API** (no key) and is still mock-server-only. Redo this
+checklist for a new model id, or for Anthropic, and write down what you find.
 
 ## Setup
 
@@ -15,7 +18,7 @@ export READYSPEC_MODEL=claude-sonnet-5   # optional
 
 # Gemini
 export GEMINI_API_KEY=...                # PowerShell: $env:GEMINI_API_KEY = "..."  (GOOGLE_API_KEY also works)
-export READYSPEC_MODEL=gemini-2.5-flash  # optional
+export READYSPEC_MODEL=gemini-3.6-flash  # optional
 
 # Either way, optional: your model's price, so cost is computed instead of shown as unknown
 export READYSPEC_PRICE_IN_PER_MTOK=...
@@ -41,9 +44,12 @@ demonstration ticket without error. It prints the questions, citation counts and
 | `Model API returned 404` | Wrong `READYSPEC_MODEL` id for the provider you selected |
 | (Anthropic) `Model API returned 400: ... tool` | JSON Schema the API rejects (check `generate.ts` schema export) |
 | (Anthropic) `Model returned no structured result` | Forced tool call not honoured for this model |
-| (Gemini) `Model API returned 400 ...responseSchema...` | `toGeminiSchema` in `gemini.ts` didn't strip something the API rejects — extend its `DROP` set |
-| (Gemini) `Model returned no structured result (finishReason: MAX_TOKENS)` | Raise `maxOutputTokens` for that stage, or the model is stalling on the schema |
-| (Gemini) `Model blocked the request: SAFETY` (or similar) | Content-safety filter tripped on the ticket or an excerpt; try a different ticket first to isolate it |
+| (Gemini) `400 ... Unknown name "X" ... Cannot find field` | A JSON Schema keyword the live API rejects by that exact name — add `X` to `toGeminiSchema`'s `DROP` set in `gemini.ts` (three were found and fixed this way: `propertyNames`, `additionalProperties`, `const`) |
+| (Gemini) `400 ... "type" ... Proto field is not repeating, cannot start list` | A `.nullable()` field rendered as `"type": ["string","null"]`; already translated to `{type, nullable:true}` in `toGeminiSchema` — if you see this again, a new schema shape needs the same treatment |
+| (Gemini) `finishReason: MAX_TOKENS` with no text at all | A reasoning model burned the whole `maxOutputTokens` budget on hidden "thinking" tokens before writing the answer; already fixed with `thinkingConfig: {thinkingBudget: 0}` — if you still see this, that stage's budget may just be too small |
+| (Gemini) `429 ... exceeded your current quota` | Free-tier rate/quota limit, not a code bug; the session fails as **recoverable** with decisions and evidence kept — wait for the quota to reset (often per-minute or per-day) and click **Resume**, or check https://ai.google.dev/gemini-api/docs/rate-limits |
+| (Anthropic) `Model API returned 400: ... tool` | JSON Schema the API rejects (check `generate.ts` schema export) |
+| (Anthropic) `Model returned no structured result` | Forced tool call not honoured for this model |
 | `gave up after 3 attempts (schema validation failed ...)` | Model output does not fit a stage schema; read the retry warnings |
 
 ## 2. UI run
@@ -67,8 +73,10 @@ npm run eval -- --provider anthropic --set dev --repeat 3
 npm run eval -- --provider gemini --set dev --repeat 3
 ```
 
-Roughly four calls per case per system pair, about 50 calls per run for the development set. Set
-`READYSPEC_MAX_CALLS` high enough for one session, and check spend with your own prices first.
+**Not yet run for either provider** (see `evals/REPORT.md`). Roughly four calls per case per system
+pair, about 50 calls per run for the development set — comfortably enough to exhaust a free-tier
+quota in one run (it happened during step 2's manual UI check, on far fewer calls). Set
+`READYSPEC_MAX_CALLS` high enough for one session, and check spend/quota with your own plan first.
 
 Outputs: `evals/results/<provider>-dev-latest.md`, a raw JSON per run, and
 `human-scoring-sheet-dev.csv`. Fill the sheet using `evals/rubrics/human-rubric.md`.

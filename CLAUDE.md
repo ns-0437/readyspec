@@ -7,12 +7,17 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 156 tests, production build, and the UI driven
-end to end in a browser. **Two things are NOT done:** (1) neither live-model path (Anthropic,
-Gemini) has ever run against a real API (no credentials were available when either was built;
-both are tested only against local mock servers), and (2) no model-dependent benchmark result
-exists. Everything that runs today uses the labelled fixture provider (scripted output).
-Benchmark: retrieval + static checklist are real; see evals/REPORT.md for what is and is not measured.
+Milestones 1-5 built and checked: lint, typecheck, 157 tests, production build, and the UI driven
+end to end in a browser. **Gemini (`gemini-3.6-flash`) is validated live** as of 2026-09-22: full
+staged pipeline completed via `npm run smoke:live` and separately through the real browser UI;
+three real schema-compatibility bugs were found from live 400s and fixed (docs/decisions.md 14) —
+the mock-server tests, written from documentation-level guesses, missed all three, which is exactly
+why "not validated" belonged in this file before now. **Still NOT done:** (1) Anthropic has never
+run against a real API (no credentials), still mock-server-only, and (2) no model-dependent
+benchmark result exists (`npm run eval` against a real provider needs dozens of calls and has not
+been run). Everything that runs by default (no key) uses the labelled fixture provider (scripted
+output). Benchmark: retrieval + static checklist are real; see evals/REPORT.md for what is and is
+not measured.
 
 ## Purpose, user, scope
 
@@ -109,7 +114,7 @@ npm run smoke:live     # first-contact live check (needs ANTHROPIC_API_KEY or GE
 
 Config (env): `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`),
 `READYSPEC_PROVIDER=fixture|anthropic|gemini`, `READYSPEC_MODEL` (default `claude-sonnet-5` /
-`gemini-2.5-flash`), `ANTHROPIC_BASE_URL`/`GEMINI_BASE_URL` (testing only),
+`gemini-3.6-flash`), `ANTHROPIC_BASE_URL`/`GEMINI_BASE_URL` (testing only),
 `READYSPEC_ALLOWED_ROOTS` (path-delimited; fixtures always allowed), `READYSPEC_DB`,
 `READYSPEC_MAX_CALLS|MAX_INPUT_TOKENS|MAX_OUTPUT_TOKENS|MAX_COST_USD`,
 `READYSPEC_PRICE_IN_PER_MTOK|PRICE_OUT_PER_MTOK` (no prices are hard-coded).

@@ -1,9 +1,17 @@
 # Evaluation report
 
-Status: **partial.** No model credentials were available when this was written, so the
+Status: **partial.** No model credentials were available when this was originally written, so the
 single-prompt baseline and every model-dependent metric of the staged workflow have **not been
-measured**. What follows is what was actually run, what it shows, and what it does not.
-Method: [docs/evaluation.md](../docs/evaluation.md).
+measured**. That is still true of this document: everything below is from the fixture provider.
+
+**Update 2026-09-22:** a Gemini key became available and was used to validate the live path itself
+(`npm run smoke:live`, then a manual run through the real UI) — see [docs/decisions.md](../docs/decisions.md)
+item 14. That confirms the pipeline works end to end against a real model (and fixed three real
+schema bugs a mock-server test couldn't have caught), but it is **not** the benchmark: the actual
+`npm run eval -- --provider gemini` run across the case set (needed to fill in the table below) has
+not happened yet — it needs dozens of calls and the key had already hit its free-tier quota during
+the UI validation. Do not read "the live path works" as "the numbers below are validated"; they
+still are not. Method: [docs/evaluation.md](../docs/evaluation.md).
 
 Run: 2026-09-21, fixture provider (no language model), `npm run eval -- --provider fixture`.
 26 cases in three groups: **development** (13, used to tune retrieval), **held-out v1** (7, run once before the

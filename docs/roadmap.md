@@ -5,18 +5,25 @@ has yet seen this run against a real model.** Everything else is secondary to th
 
 ## 1. Validate the live path (needs `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`) — do first
 
-Steps and pass criteria: [live-validation.md](live-validation.md). Do it once for whichever
-provider you have a key for; do it twice (they are independent adapters) if you have both.
+Steps and pass criteria: [live-validation.md](live-validation.md).
 
-1. `npm run smoke:live` (auth, model id, schema-constrained structured output, response shape, one full staged run).
-2. Run the demo ticket in the UI against the real model. Read the brief line by line.
-3. `npm run eval -- --provider anthropic --set dev --repeat 3` (or `--provider gemini`) to see variance.
+1. ✅ `npm run smoke:live` — **done for Gemini** 2026-09-22 (`gemini-3.6-flash`): full staged run
+   passed after fixing three real schema bugs found from live 400s (docs/decisions.md 14). Not
+   done for Anthropic (no key).
+2. ✅ Run the demo ticket in the UI against the real model — **done for Gemini**: investigate through
+   clarify worked correctly (specific questions, ignored the planted prompt-injection doc); the
+   brief call then hit a real `429` quota limit, which the app handled correctly (recoverable,
+   resumable, nothing lost). Not done for Anthropic.
+3. `npm run eval -- --provider anthropic --set dev --repeat 3` (or `--provider gemini`) to see
+   variance — **not yet run for either provider.** Needs the Gemini quota to reset (or a paid tier)
+   before trying that provider again.
 4. Human-score with [the rubric](../evals/rubrics/human-rubric.md), ideally blind and by someone else.
 5. Freeze the code, run `--set heldout-v2` once (the only clean cohort left), and replace the "not measured" table in
    [evals/REPORT.md](../evals/REPORT.md) with real numbers, failures included.
 
 Exit condition: a defensible answer to "does staged beat a single prompt on these cases, and by how much?"
-including the possibility that it does not.
+including the possibility that it does not. Steps 1-2 are a necessary but far smaller precondition —
+they show the pipeline *runs*, not that its output is *good*; steps 3-5 are what actually answers the question.
 
 ## 2. Fix whatever step 1 exposes
 

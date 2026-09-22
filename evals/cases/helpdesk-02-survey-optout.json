@@ -1,0 +1,23 @@
+{
+  "id": "helpdesk-02-survey-optout",
+  "repo": "helpdesk-platform",
+  "cohort": "v1",
+  "ticket": "Let a requester opt out of satisfaction surveys entirely.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "shouldSendSurvey has no per-requester preference check at all -- only a per-ticket surveySentAt guard. There is no requester/customer preference record anywhere in this fixture.",
+  "expectedFiles": {
+    "required": ["src/surveys/csat.ts", "src/tickets/ticket.ts"],
+    "helpful": ["docs/design.md", "src/notifications/ticket-notifications.ts"]
+  },
+  "distractors": ["src/reports/sla-report.ts", "src/kb/articles.ts", "src/routing/rules.ts"],
+  "criticalAmbiguities": [
+    { "id": "no-preference-model", "description": "There is no requester preference record of any kind; opt-out needs a new data model, not a flag on an existing type.", "anyOf": [["preference|opt.?out", "no|new|doesn't exist|not modeled|missing|model"]] },
+    { "id": "scope", "description": "Opt out of all surveys forever, or just skip one ticket at a time.", "anyOf": [["every ticket|forever|all future|permanent|once|per.?ticket", "opt.?out|surve"]] },
+    { "id": "who-can-set-it", "description": "Whether only the requester or also an agent/admin can set the opt-out.", "anyOf": [["agent|admin|requester|who", "opt.?out|set"]] }
+  ],
+  "acceptableTopics": [[["re.?opt.?in|change (their|the) mind", "surve"]], [["existing tickets|already sent", "surve"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-preference-exists", "description": "Assuming a requester preference record already exists.", "pattern": "(requester|customer) preference[s]? (already )?(exist|stored|tracked)" }
+  ]
+}

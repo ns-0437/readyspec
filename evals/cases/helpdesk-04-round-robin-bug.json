@@ -1,0 +1,25 @@
+{
+  "id": "helpdesk-04-round-robin-bug",
+  "repo": "helpdesk-platform",
+  "cohort": "v1",
+  "ticket": "Fix the bug where round-robin ticket assignment always assigns the same agent.",
+  "category": "misleading",
+  "heldOut": false,
+  "notes": "assignRoundRobin genuinely rotates via lastIndexByTeam, tracked per team and advanced on every successful assignment (tests/assignment.test.ts already asserts this). The premise is not supported by the code; a good system asks for reproduction rather than confirming a bug that isn't evidenced.",
+  "expectedFiles": {
+    "required": ["src/agents/assignment.ts"],
+    "helpful": ["src/agents/availability.ts", "tests/assignment.test.ts", "src/agents/agent.ts"]
+  },
+  "distractors": ["src/routing/rules.ts", "src/reports/agent-workload.ts", "src/kb/articles.ts"],
+  "criticalAmbiguities": [
+    { "id": "reproduction", "description": "No evidence of the described bug; ask how it was observed (which team, how many tickets, agent capacities/availability at the time).", "anyOf": [["reproduc|steps|observ|which team|how many|evidence|logs", "assign|round.?robin|bug"]] },
+    { "id": "capacity-or-availability-explanation", "description": "A single-agent outcome is fully explained by capacity limits or availability/shift configuration, not necessarily a bug.", "anyOf": [["capacity|availab|shift|offline", "same agent|one agent|always"]] }
+  ],
+  "acceptableTopics": [[["team|multiple teams", "round.?robin"]]],
+  "expectedContradictions": [
+    { "id": "rotation-is-tracked-and-tested", "description": "lastIndexByTeam is tracked per team and advanced on every assignment, and an existing test already asserts spread across agents.", "anyOf": [["lastindexbyteam|round.?robin", "track|advance|rotat|spread|test"]] }
+  ],
+  "unacceptableAssumptions": [
+    { "id": "confirms-bug", "description": "Asserting the described bug as fact rather than an unverified report.", "pattern": "(the bug is|confirmed|root cause is|always (assigns|picks) the same agent)(?!.{0,40}(no evidence|not|isn't|cannot|unverified))" }
+  ]
+}

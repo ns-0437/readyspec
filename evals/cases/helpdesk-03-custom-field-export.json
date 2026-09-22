@@ -1,0 +1,23 @@
+{
+  "id": "helpdesk-03-custom-field-export",
+  "repo": "helpdesk-platform",
+  "cohort": "v1",
+  "ticket": "Let admins export a CSV of tickets including their custom field values.",
+  "category": "ambiguous",
+  "heldOut": false,
+  "notes": "custom-fields.ts only validates values; there is no export code anywhere, and the two report modules are unrelated (SLA compliance, agent workload) -- distractors, not a starting point.",
+  "expectedFiles": {
+    "required": ["src/fields/custom-fields.ts", "src/tickets/ticket.ts"],
+    "helpful": ["src/auth/session.ts", "src/api/handlers.ts", "docs/design.md"]
+  },
+  "distractors": ["src/reports/sla-report.ts", "src/reports/agent-workload.ts", "src/kb/articles.ts", "src/macros/canned-responses.ts"],
+  "criticalAmbiguities": [
+    { "id": "which-fields", "description": "Every custom field, account-wide, or a selected subset per export.", "anyOf": [["which|select|subset|all", "field|column"]] },
+    { "id": "permission", "description": "The ticket says admins; is any agent allowed, and is requireAdmin (auth/session.ts) the right gate?", "anyOf": [["admin|permission|role|agent", "export|access"]] },
+    { "id": "no-export-today", "description": "There is no export or reporting code path for tickets today; this is new, not extending something existing.", "anyOf": [["no existing|not (currently|yet) (exist|implemented|available)|new (export|feature)", "export|csv"]] }
+  ],
+  "acceptableTopics": [[["date range|filter|status", "export"]], [["large|volume|pagination|stream", "export|csv"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-export-exists", "description": "Assuming ticket export already exists somewhere in the reports modules.", "pattern": "(ticket export|export (function|feature)) (already )?exists?" }
+  ]
+}

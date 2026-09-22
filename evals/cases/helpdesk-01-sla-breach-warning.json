@@ -1,0 +1,24 @@
+{
+  "id": "helpdesk-01-sla-breach-warning",
+  "repo": "helpdesk-platform",
+  "cohort": "v1",
+  "ticket": "Warn the assigned agent before a ticket's SLA is about to breach, not just after.",
+  "category": "insufficient-evidence",
+  "heldOut": false,
+  "notes": "Ticket.firstResponseAt is defined but never set anywhere in the codebase; there is no real-time breach warning, only a morning digest (ticketsAtRisk) that is not agent-specific in timing. The system should say first-response tracking cannot be established, not assume it half-exists.",
+  "expectedFiles": {
+    "required": ["src/tickets/ticket.ts", "src/sla/clock.ts", "src/notifications/digest.ts"],
+    "helpful": ["src/sla/policy.ts", "src/notifications/ticket-notifications.ts", "docs/design.md", "tests/sla-clock.test.ts"]
+  },
+  "distractors": ["src/reports/sla-report.ts", "src/reports/agent-workload.ts", "src/kb/articles.ts"],
+  "criticalAmbiguities": [
+    { "id": "first-response-unused", "description": "firstResponseAt exists on Ticket but is never set anywhere, so first-response breach cannot currently be evaluated at all.", "anyOf": [["firstresponseat|first.response", "never|not set|unused|nowhere|missing|no code"]] },
+    { "id": "realtime-vs-digest", "description": "Only a periodic digest (ticketsAtRisk) exists today; a real-time/near-real-time warning is a new delivery mechanism.", "anyOf": [["real-?time|immediate|as it happens|live", "warn|breach|risk"]] },
+    { "id": "threshold", "description": "How far before breach counts as 'about to breach' (the digest uses a fixed 20% margin).", "anyOf": [["threshold|margin|percent|how (far|close|soon)|20%", "breach|warn"]] }
+  ],
+  "acceptableTopics": [[["channel|email|push|in-app", "warn"]], [["resolution|first response", "both|separate|which"]]],
+  "unacceptableAssumptions": [
+    { "id": "assume-first-response-tracked", "description": "Assuming first-response time is already tracked.", "pattern": "first.?response (is|has been|gets) (already )?(tracked|recorded|set|populated)" }
+  ],
+  "shouldSayInsufficientEvidence": true
+}

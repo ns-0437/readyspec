@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { AnthropicProvider } from "@/server/llm/anthropic";
+import { GeminiProvider } from "@/server/llm/gemini";
 import { Budget, costUsd, limitsFromEnv } from "@/server/llm/budget";
 import { createProvider } from "@/server/llm";
 import { extractJson, generateStructured, StageError } from "@/server/llm/generate";
@@ -139,8 +140,20 @@ describe("budget and configuration", () => {
   it("selects the provider from the environment", () => {
     expect(createProvider({}).info.kind).toBe("fixture");
     expect(createProvider({ ANTHROPIC_API_KEY: "sk-ant-test-key-123456789012345" }).info.kind).toBe("anthropic");
+    expect(createProvider({ GEMINI_API_KEY: "test-gemini-key" }).info.kind).toBe("gemini");
+    expect(createProvider({ GOOGLE_API_KEY: "test-google-key" }).info.kind).toBe("gemini");
+    // Both set and no explicit choice: Anthropic wins (documented order), never a silent third state.
+    expect(createProvider({ ANTHROPIC_API_KEY: "a", GEMINI_API_KEY: "g" }).info.kind).toBe("anthropic");
+    expect(createProvider({ READYSPEC_PROVIDER: "gemini", ANTHROPIC_API_KEY: "a", GEMINI_API_KEY: "g" }).info.kind).toBe("gemini");
     expect(createProvider({ READYSPEC_PROVIDER: "fixture", ANTHROPIC_API_KEY: "k" }).info.kind).toBe("fixture");
     expect(() => createProvider({ READYSPEC_PROVIDER: "anthropic" })).toThrow(/ANTHROPIC_API_KEY/);
+    expect(() => createProvider({ READYSPEC_PROVIDER: "gemini" })).toThrow(/GEMINI_API_KEY/);
+    expect(() => createProvider({ READYSPEC_PROVIDER: "openai" })).toThrow(/Unknown READYSPEC_PROVIDER/);
+  });
+
+  it("READYSPEC_MODEL overrides whichever provider is selected", () => {
+    expect(createProvider({ ANTHROPIC_API_KEY: "a", READYSPEC_MODEL: "claude-custom" }).info.model).toBe("claude-custom");
+    expect(createProvider({ GEMINI_API_KEY: "g", READYSPEC_MODEL: "gemini-custom" }).info.model).toBe("gemini-custom");
   });
 });
 
@@ -228,6 +241,104 @@ describe("AnthropicProvider (mock HTTP server)", () => {
 
   it("reports network failure as retryable", async () => {
     const dead = new AnthropicProvider({ apiKey: KEY, model: "m", baseUrl: "http://127.0.0.1:1" });
+    await expect(dead.complete(req())).rejects.toMatchObject({ name: "ProviderError", retryable: true });
+  });
+
+  it("maps a caller abort to CancelledError", async () => {
+    mode = "ok";
+    const ctl = new AbortController();
+    ctl.abort();
+    await expect(provider().complete({ ...req(), signal: ctl.signal })).rejects.toBeInstanceOf(CancelledError);
+  });
+});
+
+/* ---- Gemini adapter against a local mock server (no network, no real key) ---- */
+
+describe("GeminiProvider (mock HTTP server)", () => {
+  let server: http.Server;
+  let base: string;
+  let last: { url: string; headers: http.IncomingHttpHeaders; body: Record<string, unknown> } | null = null;
+  let mode: "ok" | "429" | "401" | "bad" | "blocked" | "empty" = "ok";
+  const KEY = "gemini-test-SECRETKEY-0123456789abcdef";
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", (c) => (data += c));
+      req.on("end", () => {
+        last = { url: req.url ?? "", headers: req.headers, body: JSON.parse(data) as Record<string, unknown> };
+        const send = (status: number, obj: unknown) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+        if (mode === "429") return send(429, { error: { message: "slow down" } });
+        if (mode === "401") return send(401, { error: { message: `invalid key ${KEY}` } });
+        if (mode === "bad") return send(200, { nope: true });
+        if (mode === "blocked") return send(200, { promptFeedback: { blockReason: "SAFETY" } });
+        if (mode === "empty") return send(200, { candidates: [{ content: { parts: [{ text: "" }] }, finishReason: "MAX_TOKENS" }] });
+        send(200, { candidates: [{ content: { parts: [{ text: '{"n":7}' }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 11, candidatesTokenCount: 3 } });
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+  afterAll(() => new Promise<void>((r) => server.close(() => r())));
+
+  const req = (): LlmRequest => ({ stage: "analyze", system: "SYS", user: "USER", schemaName: "T", jsonSchema: { type: "object", properties: { n: { type: "number" } }, additionalProperties: false, $schema: "x" }, maxOutputTokens: 123 });
+  const provider = () => new GeminiProvider({ apiKey: KEY, model: "gemini-test", baseUrl: base });
+
+  it("sends the key in a header (not the URL), requests JSON with a schema, and parses usage", async () => {
+    mode = "ok";
+    const res = await provider().complete(req());
+    expect(JSON.parse(res.text)).toEqual({ n: 7 });
+    expect(res.usage).toEqual({ inputTokens: 11, outputTokens: 3 });
+    expect(last!.headers["x-goog-api-key"]).toBe(KEY);
+    expect(last!.url).not.toContain(KEY);
+    expect(last!.url).toContain("gemini-test:generateContent");
+    expect(last!.body).toMatchObject({ generationConfig: { maxOutputTokens: 123, responseMimeType: "application/json" } });
+    expect(last!.body.systemInstruction).toEqual({ role: "system", parts: [{ text: "SYS" }] });
+    expect(JSON.stringify(last!.body)).not.toContain(KEY);
+  });
+
+  it("strips JSON Schema keywords the API does not accept from responseSchema", async () => {
+    mode = "ok";
+    await provider().complete(req());
+    const schema = (last!.body.generationConfig as { responseSchema: Record<string, unknown> }).responseSchema;
+    expect(schema).not.toHaveProperty("additionalProperties");
+    expect(schema).not.toHaveProperty("$schema");
+    expect(schema).toMatchObject({ type: "object" });
+  });
+
+  it("never sends stage context (only rendered prompts) to the API", async () => {
+    mode = "ok";
+    await provider().complete({ ...req(), context: { secretFixtureOnlyThing: "LEAK-CHECK" } });
+    expect(JSON.stringify(last!.body)).not.toContain("LEAK-CHECK");
+  });
+
+  it("classifies 429 as retryable and 401 as not, without echoing the key", async () => {
+    mode = "429";
+    await expect(provider().complete(req())).rejects.toMatchObject({ name: "ProviderError", retryable: true, status: 429 });
+    mode = "401";
+    const err = await provider().complete(req()).catch((e: Error) => e);
+    expect(err).toMatchObject({ retryable: false, status: 401 });
+    expect((err as Error).message).not.toContain("SECRETKEY-0123456789abcdef");
+    expect((err as Error).message).toContain("[REDACTED]");
+  });
+
+  it("treats a safety block as non-retryable", async () => {
+    mode = "blocked";
+    await expect(provider().complete(req())).rejects.toMatchObject({ retryable: false, message: expect.stringContaining("SAFETY") });
+  });
+
+  it("treats an empty candidate (e.g. hit max tokens) as retryable", async () => {
+    mode = "empty";
+    await expect(provider().complete(req())).rejects.toMatchObject({ retryable: true, message: expect.stringContaining("MAX_TOKENS") });
+  });
+
+  it("rejects malformed responses as non-retryable", async () => {
+    mode = "bad";
+    await expect(provider().complete(req())).rejects.toMatchObject({ retryable: false });
+  });
+
+  it("reports network failure as retryable", async () => {
+    const dead = new GeminiProvider({ apiKey: KEY, model: "m", baseUrl: "http://127.0.0.1:1" });
     await expect(dead.complete(req())).rejects.toMatchObject({ name: "ProviderError", retryable: true });
   });
 

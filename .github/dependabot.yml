@@ -29,6 +29,12 @@ updates:
       # tested upgrade, not an automatic PR.
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
+      # typescript-eslint@8.70.0's peer dependency is typescript@">=4.8.4 <6.1.0", so a TS major
+      # bump breaks `npm ci` outright (ERESOLVE) before anything even runs -- confirmed live when
+      # Dependabot proposed 6.0.3 -> 7.0.2 and CI failed at install. Re-enable once
+      # typescript-eslint ships support for TS 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

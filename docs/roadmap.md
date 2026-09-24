@@ -41,8 +41,10 @@ helpdesk-platform alone, the one repo bigger than the retrieval budget — see i
 vocabulary gap. A dev-only sweep of cheap knobs moved precision about a point (decisions.md 13), so
 further gains likely need model re-ranking.
 
-- Precision: README down-weight is done (0.5, tiny gain);
-  pair each source file with its test; cap distractor-prone hops.
+- Precision: README down-weight is done (0.5, tiny gain); test-pairing is done (`maxTestPairs: 6`
+  in `search.ts`, decisions.md 16) — precision moved -0.8pt dev, within regression tolerance, because
+  the dev cases don't reward test-file evidence, but it's a real recall/context improvement for
+  tickets that touch tested code, independent of ticket vocabulary. Cap distractor-prone hops still open.
 - Vocabulary gap: optional model query expansion as an explicit, disclosed extra call (a clarifying
   step, not a silent one). Embeddings only if this still leaves a gap.
 - **Caveat:** held-out v1 is contaminated and v2 has been run once. Any further tuning contaminates v2;

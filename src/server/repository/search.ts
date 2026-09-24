@@ -219,6 +219,8 @@ export interface RetrievalOptions {
   /** Always keep at least this many top-scoring chunks, even below the cutoff (recall over precision at this stage). */
   minItems: number;
   maxReferenceHops: number;
+  /** Cap on excerpts added by pairing a retrieved source file with its own test file. */
+  maxTestPairs: number;
 }
 
 export const DEFAULT_RETRIEVAL: RetrievalOptions = {
@@ -229,7 +231,22 @@ export const DEFAULT_RETRIEVAL: RetrievalOptions = {
   relativeCutoff: 0.22,
   minItems: 6,
   maxReferenceHops: 6,
+  maxTestPairs: 6,
 };
+
+/**
+ * Conventional test file paths for a source file, matching this project's own fixtures:
+ * "src/foo/bar.ts" -> "tests/bar.test.ts" (TS/JS) and "src/foo/bar.py" -> "tests/test_bar.py"
+ * (Python). Unlike the reference/definition hops, this never depends on ticket vocabulary at all
+ * -- a file's own tests document its behavior regardless of what the ticket happens to say.
+ */
+export function candidateTestPaths(sourcePath: string): string[] {
+  const slash = sourcePath.lastIndexOf("/");
+  const file = slash >= 0 ? sourcePath.slice(slash + 1) : sourcePath;
+  const dot = file.lastIndexOf(".");
+  const stem = dot > 0 ? file.slice(0, dot) : file;
+  return [`tests/${stem}.test.ts`, `tests/test_${stem}.py`];
+}
 
 const overlaps = (a: { path: string; startLine: number; endLine: number }, b: { path: string; startLine: number; endLine: number }) =>
   a.path === b.path && a.startLine <= b.endLine && b.startLine <= a.endLine;
@@ -321,6 +338,25 @@ export function retrieveEvidence(snapshot: Snapshot, ticket: string, options: Pa
       const def = candidates[0] as Chunk;
       if (def.path === p.path || forward >= opt.maxReferenceHops) continue;
       if (tryAdd({ chunk: def, score: p.score * 0.35, matched: [id], reason: "" }, p.score * 0.35, `defines ${id}, used by ${p.path}`)) forward++;
+    }
+  }
+
+  // Test pairing: for each picked source file, pull in its conventional test file if the repo has
+  // one. Runs after the reference/definition hops so it only pairs files the ticket's vocabulary
+  // already surfaced, and is capped independently since it can otherwise add one excerpt per file.
+  const sourcesPaired = new Set<string>();
+  let testPairs = 0;
+  for (const p of [...picked]) {
+    if (testPairs >= opt.maxTestPairs) break;
+    if (/(^|\/)tests?\//i.test(p.path) || sourcesPaired.has(p.path)) continue;
+    sourcesPaired.add(p.path);
+    for (const testPath of candidateTestPaths(p.path)) {
+      if (testPairs >= opt.maxTestPairs) break;
+      for (const c of index.chunks) {
+        if (testPairs >= opt.maxTestPairs) break;
+        if (c.path !== testPath) continue;
+        if (tryAdd({ chunk: c, score: p.score * 0.3, matched: [], reason: "" }, p.score * 0.3, `tests ${p.path}, which was retrieved`)) testPairs++;
+      }
     }
   }
 

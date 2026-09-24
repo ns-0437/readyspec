@@ -153,3 +153,17 @@ retrieval step runs entirely before any model call, so a case that failed later 
 correct retrieval data that should not be thrown away. Confirmed against the live Gemini run from earlier the same
 day, where every model call had failed on quota: re-aggregating its raw output with the fix recovered real
 retrieval numbers (96% recall, 57% precision) that the original run had reported as "n/a".
+
+## 16. Test-pairing retrieval pass
+Item 3 of the roadmap named this as an open idea: pair each retrieved source file with its own test file, since a
+file's tests document its behavior regardless of what vocabulary the ticket happens to use. Implemented as a new
+pass in `retrieveEvidence()` (`src/server/repository/search.ts`), running after the reference/definition hops and
+before the final sort: for every picked source file (skipping files already under `tests/`), look up its
+conventional test path — `tests/<stem>.test.ts` for the TypeScript/JS fixtures, `tests/test_<stem>.py` for the
+Python one (`team-tasks`) — and add any matching chunks via the same `tryAdd` budget/dedup gate the other passes
+use, capped at a new `maxTestPairs` option (default 6). Unlike the second-hop/forward-hop passes, this never reads
+ticket text at all, so it can't be tuned to a specific benchmark case by construction. Regression check
+(`npm run eval:regression`) after the change: recall unchanged (97.1%), distractors/case unchanged (0.71),
+precision -0.8pt (52.4% -> 51.6%), well inside tolerance — expected, since none of the 17 dev cases currently
+reward test-file evidence in their `expectedFiles`. Left the checked-in baseline as-is rather than lowering it,
+since the drop is real cost from the feature's own excerpts, not drift to paper over.

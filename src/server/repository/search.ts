@@ -219,6 +219,13 @@ export interface RetrievalOptions {
   /** Always keep at least this many top-scoring chunks, even below the cutoff (recall over precision at this stage). */
   minItems: number;
   maxReferenceHops: number;
+  /**
+   * Cap on second-hop excerpts pulled in for any single definer. Without this, one common
+   * identifier (a widely-used type or a short but valid name) can exhaust the whole
+   * maxReferenceHops budget on its own references before other, more specific definers get a
+   * turn -- exactly the distractor-prone case flagged in docs/roadmap.md item 3.
+   */
+  maxHopsPerDefiner: number;
   /** Cap on excerpts added by pairing a retrieved source file with its own test file. */
   maxTestPairs: number;
 }
@@ -231,6 +238,7 @@ export const DEFAULT_RETRIEVAL: RetrievalOptions = {
   relativeCutoff: 0.22,
   minItems: 6,
   maxReferenceHops: 6,
+  maxHopsPerDefiner: 3,
   maxTestPairs: 6,
 };
 
@@ -308,13 +316,18 @@ export function retrieveEvidence(snapshot: Snapshot, ticket: string, options: Pa
     .map((p) => ({ name: p.symbol as string, path: p.path, score: p.score }));
   let hops = 0;
   for (const d of definers) {
+    let hopsForDefiner = 0;
     const re = new RegExp(`\\b${d.name.replace(/[$]/g, "\\$")}\\b`);
     for (const c of index.chunks) {
       if (hops >= opt.maxReferenceHops) break;
+      if (hopsForDefiner >= opt.maxHopsPerDefiner) break;
       if (c.path === d.path || !re.test(c.text)) continue;
       const already = picked.some((p) => overlaps(p, c));
       if (already) continue;
-      if (tryAdd({ chunk: c, score: d.score * 0.4, matched: [d.name], reason: "" }, d.score * 0.4, `references ${d.name} (defined in ${d.path})`)) hops++;
+      if (tryAdd({ chunk: c, score: d.score * 0.4, matched: [d.name], reason: "" }, d.score * 0.4, `references ${d.name} (defined in ${d.path})`)) {
+        hops++;
+        hopsForDefiner++;
+      }
     }
   }
 

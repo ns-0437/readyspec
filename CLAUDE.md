@@ -128,8 +128,9 @@ Config (env): `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`),
   known-unsupported keywords, but this is unverified against the live API (docs/decisions.md 14).
 - Retrieval is lexical + symbol-aware; symbol extraction is regex-based (TS/JS/Py/Md), not a parser.
 - Follow-up rounds re-retrieve from ticket + answers; new excerpts (>=2 answer-introduced terms) need a second consent.
-- Retrieval precision: 51.6% dev / 48% held-out v2 (recall 97.1% dev / 100% held-out v2, small samples); one dev
-  miss is a vocabulary gap. v2 predates test-pairing (decisions.md 16) and is frozen (contaminates on rerun).
+- Retrieval precision: 52.5% dev / 48% held-out v2 (recall 97.1% dev / 100% held-out v2, small samples); one dev
+  miss is a vocabulary gap. v2 predates test-pairing and the hop cap (decisions.md 16, 18) and is frozen
+  (contaminates on rerun).
 - Snapshots keep file contents in the local SQLite file; deleting a session removes unshared snapshots.
 - Snapshot creation is synchronous and capped (1500 files / 12 MB / 200 KB per file).
 - Support check is lexical: it catches invented identifiers, not wrong meaning.

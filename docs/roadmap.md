@@ -36,15 +36,19 @@ Likely suspects, in the order I would check them:
 
 ## 3. Retrieval quality (no key needed, but mind the held-out set)
 
-Current numbers: recall 97.1% dev (17 cases) / 100% clean held-out v2, precision 51.6% dev / 48% v2 (36% on
+Current numbers: recall 97.1% dev (17 cases) / 100% clean held-out v2, precision 52.5% dev / 48% v2 (36% on
 helpdesk-platform alone, the one repo bigger than the retrieval budget — see item 5); one dev miss is a
 vocabulary gap. A dev-only sweep of cheap knobs moved precision about a point (decisions.md 13), so
-further gains likely need model re-ranking. v2 predates test-pairing (decisions.md 16) and stays frozen.
+further gains likely need model re-ranking. v2 predates test-pairing and the hop cap (decisions.md 16, 18)
+and stays frozen.
 
 - Precision: README down-weight is done (0.5, tiny gain); test-pairing is done (`maxTestPairs: 6`
-  in `search.ts`, decisions.md 16) — precision moved -0.8pt dev, within regression tolerance, because
-  the dev cases don't reward test-file evidence, but it's a real recall/context improvement for
-  tickets that touch tested code, independent of ticket vocabulary. Cap distractor-prone hops still open.
+  in `search.ts`, decisions.md 16) — a real context improvement for tickets that touch tested code,
+  independent of ticket vocabulary, though it cost dev precision slightly on its own. Capping
+  distractor-prone hops is done too (`maxHopsPerDefiner: 3`, decisions.md 18): one over-referenced
+  symbol can no longer consume the whole second-hop budget before other definers get a turn.
+  Together: distractors/case 0.71 -> 0.59, precision 52.4% -> 52.5%, recall unchanged (baseline
+  updated). Both bullets in this item are now done; further gains likely need model re-ranking.
 - Vocabulary gap: optional model query expansion as an explicit, disclosed extra call (a clarifying
   step, not a silent one). Embeddings only if this still leaves a gap.
 - **Caveat:** held-out v1 is contaminated and v2 has been run once. Any further tuning contaminates v2;

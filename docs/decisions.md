@@ -154,18 +154,6 @@ correct retrieval data that should not be thrown away. Confirmed against the liv
 day, where every model call had failed on quota: re-aggregating its raw output with the fix recovered real
 retrieval numbers (96% recall, 57% precision) that the original run had reported as "n/a".
 
-## 17. GitHub-issue-shaped export
-Roadmap item 6 named a Markdown export variant meant to be pasted into a GitHub issue body. Added
-`exportGithubIssue()` (`src/server/workflow/export.ts`), wired to `GET /api/sessions/:id/export?format=issue`
-and a new "Export as GitHub issue" button in `BriefPanel`. It keeps the fixture/demo disclosure banners
-(a fixture brief must never be presented as real, per CLAUDE.md) but drops the full evidence index and
-per-item citation lists the full Markdown export carries for audit purposes: acceptance criteria, steps and
-tests render as `- [ ]` task-list checkboxes instead, which GitHub renders as trackable checklists. The
-full evidence-linked export (Markdown or JSON) stays the audit trail; this variant is for tracking the work,
-not re-deriving it. Verified live against the fixture provider through the actual UI (not just unit tests):
-investigate through brief generation, then fetched the exported body and confirmed the checkbox formatting
-and banners render correctly.
-
 ## 16. Test-pairing retrieval pass
 Item 3 of the roadmap named this as an open idea: pair each retrieved source file with its own test file, since a
 file's tests document its behavior regardless of what vocabulary the ticket happens to use. Implemented as a new
@@ -179,3 +167,28 @@ ticket text at all, so it can't be tuned to a specific benchmark case by constru
 precision -0.8pt (52.4% -> 51.6%), well inside tolerance — expected, since none of the 17 dev cases currently
 reward test-file evidence in their `expectedFiles`. Left the checked-in baseline as-is rather than lowering it,
 since the drop is real cost from the feature's own excerpts, not drift to paper over.
+
+## 17. GitHub-issue-shaped export
+Roadmap item 6 named a Markdown export variant meant to be pasted into a GitHub issue body. Added
+`exportGithubIssue()` (`src/server/workflow/export.ts`), wired to `GET /api/sessions/:id/export?format=issue`
+and a new "Export as GitHub issue" button in `BriefPanel`. It keeps the fixture/demo disclosure banners
+(a fixture brief must never be presented as real, per CLAUDE.md) but drops the full evidence index and
+per-item citation lists the full Markdown export carries for audit purposes: acceptance criteria, steps and
+tests render as `- [ ]` task-list checkboxes instead, which GitHub renders as trackable checklists. The
+full evidence-linked export (Markdown or JSON) stays the audit trail; this variant is for tracking the work,
+not re-deriving it. Verified live against the fixture provider through the actual UI (not just unit tests):
+investigate through brief generation, then fetched the exported body and confirmed the checkbox formatting
+and banners render correctly.
+
+## 18. Per-definer cap on the symbol-aware second hop
+The other half of roadmap item 3's precision bullet: "cap distractor-prone hops." The second hop in
+`retrieveEvidence()` (`src/server/repository/search.ts`) walks up to 6 "definer" symbols from the top picks and,
+for each, pulls in chunks elsewhere that reference it, sharing one `maxReferenceHops` budget across all of them.
+A single common-but-valid identifier (e.g. a widely-used type or helper referenced all over the codebase) could
+exhaust that entire shared budget on its own references before any other, more specific definer got a turn --
+distractor-prone by construction, and worse the more a repository reuses a name. Added `maxHopsPerDefiner`
+(default 3, half of `maxReferenceHops`) so each definer's contribution is capped independently; the shared total
+cap still applies on top. `npm run eval:regression`: recall unchanged (97.1%), precision 52.4% -> 52.5%,
+distractors/case 0.71 -> 0.59 -- a genuine improvement (measured against the original baseline, before item 16's
+own small dev-precision cost), so `evals/baseline-retrieval.json` was regenerated via `--write-baseline` rather
+than left at the old numbers.

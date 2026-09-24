@@ -38,5 +38,5 @@ export const api = {
   declineFollowUp: (id: string) => request(`/api/sessions/${id}/followup/decline`, Accepted, { method: "POST" }),
   cancel: (id: string) => request(`/api/sessions/${id}/cancel`, z.object({ cancelled: z.boolean() }), { method: "POST" }),
   resume: (id: string) => request(`/api/sessions/${id}/resume`, Accepted, { method: "POST" }),
-  exportUrl: (id: string, format: "md" | "json") => `/api/sessions/${id}/export?format=${format}`,
+  exportUrl: (id: string, format: "md" | "json" | "issue") => `/api/sessions/${id}/export?format=${format}`,
 };

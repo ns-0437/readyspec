@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { contentOf, removeItem, removeScopeItem, setItemText, setScopeItem } from "@/shared/brief-edit";
 import { traceCriterion } from "@/shared/trace";
 import type { Brief, EvidenceItem } from "@/shared/schemas";
-import { exportMarkdown, exportJson } from "@/server/workflow/export";
+import { exportGithubIssue, exportJson, exportMarkdown } from "@/server/workflow/export";
 import { makeService, runToReview } from "./helpers";
 
 let brief: Brief;
@@ -105,5 +105,16 @@ describe("exports", () => {
   it("refuses to export a session without a brief", () => {
     expect(() => exportMarkdown({ ...detail, brief: null })).toThrow();
     expect(() => exportJson({ ...detail, brief: null })).toThrow();
+    expect(() => exportGithubIssue({ ...detail, brief: null })).toThrow();
+  });
+
+  it("GitHub-issue export uses task-list checkboxes and drops the audit-trail evidence index", () => {
+    const issue = exportGithubIssue(detail);
+    expect(issue).toContain("FIXTURE OUTPUT");
+    expect(issue).toContain("DEMONSTRATION DATA");
+    expect(issue).toContain("- [ ] **ac-1**");
+    expect(issue).not.toContain("## Evidence index");
+    expect(issue).not.toContain("§");
+    expect(issue).not.toContain("demo-not-a-real-secret");
   });
 });

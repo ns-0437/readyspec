@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { exportJson, exportMarkdown } from "@/server/workflow/export";
+import { exportGithubIssue, exportJson, exportMarkdown } from "@/server/workflow/export";
 import { getService } from "@/server/workflow/service";
 import { NotFoundError, RuleViolationError } from "@/server/workflow/errors";
 import { withHandler, type Ctx } from "../../../_lib";
@@ -14,12 +14,14 @@ export const GET = (req: Request, ctx: Ctx) =>
     if (!detail) throw new NotFoundError();
     if (!detail.brief) throw new RuleViolationError("This session has no brief yet");
     const format = new URL(req.url).searchParams.get("format") ?? "md";
-    if (format !== "md" && format !== "json") throw new RuleViolationError("format must be md or json");
+    if (format !== "md" && format !== "json" && format !== "issue") throw new RuleViolationError("format must be md, json or issue");
     const safeName = detail.session.id;
-    return new NextResponse(format === "json" ? exportJson(detail) : exportMarkdown(detail), {
+    const body = format === "json" ? exportJson(detail) : format === "issue" ? exportGithubIssue(detail) : exportMarkdown(detail);
+    const ext = format === "json" ? "json" : format === "issue" ? "issue.md" : "md";
+    return new NextResponse(body, {
       headers: {
         "content-type": format === "json" ? "application/json; charset=utf-8" : "text/markdown; charset=utf-8",
-        "content-disposition": `attachment; filename="readyspec-${safeName}.${format === "json" ? "json" : "md"}"`,
+        "content-disposition": `attachment; filename="readyspec-${safeName}.${ext}"`,
       },
     });
   });

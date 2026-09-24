@@ -70,7 +70,9 @@ past a single data point.
 
 - Diff between brief revisions; show what an edit or a follow-up round changed.
 - Inline highlighting of the cited lines inside the excerpt when a claim or criterion is selected.
-- Export a GitHub-issue-shaped Markdown variant.
+- ✅ Export a GitHub-issue-shaped Markdown variant — done: `exportGithubIssue()` in
+  `src/server/workflow/export.ts` (`?format=issue`), task-list checkboxes for criteria/steps/tests,
+  no evidence index (see decisions.md 17).
 - Accessibility pass (focus order in the inspector, screen-reader labels on badges).
 - Screenshots and a short recording in the README.
 

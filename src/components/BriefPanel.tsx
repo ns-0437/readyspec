@@ -257,6 +257,7 @@ export function BriefPanel({ detail, busy, act, selectedCriterion, onSelectCrite
         <div className="row">
           <a className="btn" href={api.exportUrl(session.id, "md")} download>Export Markdown</a>
           <a className="btn" href={api.exportUrl(session.id, "json")} download>Export JSON</a>
+          <a className="btn" href={api.exportUrl(session.id, "issue")} download>Export as GitHub issue</a>
         </div>
       </section>
     </div>

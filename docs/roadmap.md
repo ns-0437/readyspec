@@ -36,10 +36,10 @@ Likely suspects, in the order I would check them:
 
 ## 3. Retrieval quality (no key needed, but mind the held-out set)
 
-Current numbers: recall 97% dev (17 cases) / 100% clean held-out v2, precision 52% dev / 48% v2 (36% on
+Current numbers: recall 97.1% dev (17 cases) / 100% clean held-out v2, precision 51.6% dev / 48% v2 (36% on
 helpdesk-platform alone, the one repo bigger than the retrieval budget — see item 5); one dev miss is a
 vocabulary gap. A dev-only sweep of cheap knobs moved precision about a point (decisions.md 13), so
-further gains likely need model re-ranking.
+further gains likely need model re-ranking. v2 predates test-pairing (decisions.md 16) and stays frozen.
 
 - Precision: README down-weight is done (0.5, tiny gain); test-pairing is done (`maxTestPairs: 6`
   in `search.ts`, decisions.md 16) — precision moved -0.8pt dev, within regression tolerance, because

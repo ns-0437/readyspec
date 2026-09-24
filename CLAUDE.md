@@ -7,7 +7,7 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 162 tests, production build, and the UI driven
+Milestones 1-5 built and checked: lint, typecheck, 171 tests, production build, and the UI driven
 end to end in a browser. **Gemini (`gemini-3.6-flash`) is validated live** as of 2026-09-22: full
 staged pipeline completed via `npm run smoke:live` and separately through the real browser UI;
 three real schema-compatibility bugs were found from live 400s and fixed (docs/decisions.md 14) —
@@ -83,9 +83,9 @@ long files; prefer the Write/Edit tools for source with regexes.
 
 - `src/shared/schemas.ts` — every Zod schema/type (evidence, analysis, questions, brief, verification, session, API bodies, baseline output).
 - `src/shared/{redact,trace,brief-edit}.ts` — secret patterns; criterion traceability; pure draft-editing ops.
-- `src/server/repository/` — `safe-fs` (root/allowlist/traversal), `filters` (exclusions, injection heuristics), `snapshot`, `symbols`, `search` (BM25 + symbol hops), `evidence` (ids, hashing, verification), `inspect`, `discover`, `types`.
+- `src/server/repository/` — `safe-fs` (root/allowlist/traversal), `filters` (exclusions, injection heuristics), `snapshot`, `symbols`, `search` (BM25 + symbol hops + test-file pairing, decisions.md 16), `evidence` (ids, hashing, verification), `inspect`, `discover`, `types`.
 - `src/server/llm/` — `provider` (interfaces, errors), `anthropic`, `gemini`, `fixture/` (scripted demo + mechanical fallback), `generate` (retries/validation/cancel), `budget`, `contexts`, `prompts/`, `index` (provider selection: explicit `READYSPEC_PROVIDER` wins; else key presence, Anthropic preferred if both set; else fixture).
-- `src/server/workflow/` — `investigate` (stages 1-2 + disclosure), `stages` (analyze/clarify/brief/judge), `verify` + `support` (stage 6), `service` (session state machine, jobs), `export`, `errors`.
+- `src/server/workflow/` — `investigate` (stages 1-2 + disclosure), `stages` (analyze/clarify/brief/judge), `verify` + `support` (stage 6), `service` (session state machine, jobs), `export` (Markdown, JSON, GitHub-issue-shaped, decisions.md 17), `errors`.
 - `src/server/persistence/` — `db` (schema), `store` (typed access).
 - `src/app/` — `page.tsx`, `sessions/[id]/page.tsx`, `api/**/route.ts`.
 - `src/components/` — `Home`, `Workspace`, `TicketPanel`, `EvidenceExplorer` (+ traceability inspector), `BriefPanel`, `ActivityLog`, `Badges`, `api`.
@@ -128,7 +128,8 @@ Config (env): `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`),
   known-unsupported keywords, but this is unverified against the live API (docs/decisions.md 14).
 - Retrieval is lexical + symbol-aware; symbol extraction is regex-based (TS/JS/Py/Md), not a parser.
 - Follow-up rounds re-retrieve from ticket + answers; new excerpts (>=2 answer-introduced terms) need a second consent.
-- Retrieval precision: 57% dev / 48% held-out v2 (recall 96% dev / 100% held-out v2, small samples); one dev miss is a vocabulary gap.
+- Retrieval precision: 51.6% dev / 48% held-out v2 (recall 97.1% dev / 100% held-out v2, small samples); one dev
+  miss is a vocabulary gap. v2 predates test-pairing (decisions.md 16) and is frozen (contaminates on rerun).
 - Snapshots keep file contents in the local SQLite file; deleting a session removes unshared snapshots.
 - Snapshot creation is synchronous and capped (1500 files / 12 MB / 200 KB per file).
 - Support check is lexical: it catches invented identifiers, not wrong meaning.

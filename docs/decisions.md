@@ -234,3 +234,51 @@ hardcoded id collided in that cache, so the second describe block's `retrieveEvi
 returned results built from the first block's files. Fixed by giving each synthetic snapshot a
 unique id (an incrementing counter) -- worth calling out since it would have produced confusing,
 order-dependent test failures for the next person who copies this pattern without knowing why.
+
+## 21. A third provider (Groq) -- free tier, real bugs found, one fixed for all three providers
+With Anthropic still keyless and Gemini's quota exhausted, added `GroqProvider`
+(`src/server/llm/groq.ts`) against Groq's free tier (no card): OpenAI-compatible
+`/chat/completions`, structured output via `response_format: {type: "json_schema", strict: false}`.
+`strict: false` (not Groq's constrained-decoding `strict: true`) was chosen deliberately: strict
+mode requires every field to be `required` and every object to set `additionalProperties: false`,
+which fights this app's genuinely-optional schema fields and `z.record`-typed fields the same way
+Gemini's schema needed active translation (decisions.md 14) -- this app's own `generateStructured()`
+retry/validate loop is already the safety net all three providers lean on, so constrained decoding
+isn't needed. Wired into `createProvider()` (env priority: Anthropic > Gemini > Groq > fixture,
+override with `READYSPEC_PROVIDER=groq`), `ProviderInfo`/`Brief.producedBy`/`Disclosure.providerKind`
+enums, mock-server tests mirroring the Anthropic/Gemini blocks.
+
+Live-tested against a real key (2026-09-25):
+- `DEFAULT_GROQ_MODEL` was initially `llama-3.3-70b-versatile` (a reasonable guess from public
+  free-tier comparisons) -- live 404'd immediately, the model has been retired. Queried
+  `GET /openai/v1/models` with the real key to see what's actually served now and switched the
+  default to `openai/gpt-oss-120b`.
+- The single structured smoke call then passed cleanly against the real API on the first try --
+  unlike Gemini, Groq's OpenAI-compatible schema handling needed no translation layer at all.
+- The staged pipeline's `analyze` stage (reserves ~6000 completion tokens plus prompt tokens) hit a
+  429, then (after the fix below) a 413 "Request too large ... TPM": this account's Groq free tier
+  caps at 8000 tokens/minute, **shared account-wide across models**, confirmed by hitting the exact
+  same 8000 limit on both `openai/gpt-oss-120b` and `openai/gpt-oss-20b`. A single `analyze` call
+  against even the small demo repository already exceeds that budget by a small margin (requested
+  8158/8524 of 8000). This is a genuine free-tier ceiling, not a code defect -- the same category of
+  finding as Gemini's quota exhaustion (decisions.md 14), just a throughput cap instead of a
+  daily/request quota.
+
+While chasing the 429, found and fixed a real, provider-agnostic bug: `generateStructured()`'s retry
+backoff (`generate.ts`) was a fixed exponential schedule (600ms, 1.2s, ...) sized for generic
+transient errors, with no knowledge of how long a provider actually wants the caller to wait. Groq's
+429 response carries a standard `Retry-After` header (confirmed live: 22 seconds, for an 8000
+TPM/60s window) that the default backoff undershot by roughly 20x. Added `parseRetryAfterMs()` and
+`ProviderError.retryAfterMs` (`provider.ts`), read from the `retry-after` header by all three
+adapters (Groq, Gemini, Anthropic -- the header is a standard HTTP mechanism, not Groq-specific, so
+withholding it from the other two would just be an inconsistent gap waiting to bite later), and
+`computeRetryWaitMs()` in `generate.ts` takes `max(exponentialBackoff, retryAfterMs)`, capped at 90s
+so one bad header can't stall a job for hours. This fixes the 429 case; the 413 case (a single
+request already over budget) is unaffected by any retry strategy since no wait fixes it.
+
+Net: Groq is now a real, working, free third option -- validated for the mechanics that matter
+(auth, schema handling, error classification) -- but this account's specific free-tier throughput is
+too tight for the app's current prompt sizes to complete a full staged session end-to-end. Left
+`openai/gpt-oss-120b` as the default (better quality when it does fit) rather than downsizing shared
+stage token budgets to chase one tier's limit, which would cost every provider real output quality
+to work around a constraint specific to one free plan.

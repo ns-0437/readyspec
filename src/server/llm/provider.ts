@@ -34,12 +34,25 @@ export interface LlmProvider {
 export class ProviderError extends Error {
   readonly retryable: boolean;
   readonly status: number | null;
-  constructor(message: string, opts: { retryable: boolean; status?: number | null }) {
+  /** Provider-suggested wait before retrying (from a `retry-after` response header), if any. */
+  readonly retryAfterMs: number | null;
+  constructor(message: string, opts: { retryable: boolean; status?: number | null; retryAfterMs?: number | null }) {
     super(message);
     this.name = "ProviderError";
     this.retryable = opts.retryable;
     this.status = opts.status ?? null;
+    this.retryAfterMs = opts.retryAfterMs ?? null;
   }
+}
+
+/** Parses a standard `Retry-After` header (seconds, or an HTTP-date) into milliseconds. */
+export function parseRetryAfterMs(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(header);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return null;
 }
 
 export class CancelledError extends Error {

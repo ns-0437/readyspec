@@ -60,7 +60,7 @@ export const Disclosure = z.object({
   snapshotId: z.string(),
   /** "followup" lists only the NEW excerpts a later round wants to send; consent is required again. */
   scope: z.enum(["initial", "followup"]).default("initial"),
-  providerKind: z.enum(["anthropic", "gemini", "fixture"]),
+  providerKind: z.enum(["anthropic", "gemini", "groq", "fixture"]),
   providerLabel: z.string(),
   leavesMachine: z.boolean(),
   ticketChars: z.number().int(),
@@ -261,7 +261,7 @@ export const Brief = BriefContent.extend({
   /** Increments on every save; verification reports pin to a revision. */
   revision: z.number().int().min(1),
   /** How the brief was produced; carried into exports so fixture output can't pass as a model result. */
-  producedBy: z.object({ kind: z.enum(["anthropic", "gemini", "fixture"]), label: z.string() }),
+  producedBy: z.object({ kind: z.enum(["anthropic", "gemini", "groq", "fixture"]), label: z.string() }),
 });
 export type Brief = z.infer<typeof Brief>;
 
@@ -337,7 +337,7 @@ export const SessionStatus = z.enum([
 export type SessionStatus = z.infer<typeof SessionStatus>;
 
 export const ProviderInfo = z.object({
-  kind: z.enum(["anthropic", "gemini", "fixture"]),
+  kind: z.enum(["anthropic", "gemini", "groq", "fixture"]),
   label: z.string(),
   model: z.string().nullable(),
 });

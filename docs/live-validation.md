@@ -1,15 +1,20 @@
 # Live validation checklist
 
-Two model adapters exist. **Gemini (`gemini-3.6-flash`) was validated live on 2026-09-22** — steps
+Three model adapters exist. **Gemini (`gemini-3.6-flash`) was validated live on 2026-09-22** — steps
 1 and 2 below both passed; three real schema bugs were found and fixed along the way (see
 `docs/decisions.md` item 14; the "If you see" table below still documents them for future models).
-**Anthropic has never talked to a real API** (no key) and is still mock-server-only. Redo this
-checklist for a new model id, or for Anthropic, and write down what you find.
+**Groq (`openai/gpt-oss-120b`) was live-tested on 2026-09-25**: step 1's single structured call
+passes, but the staged pipeline's first real stage (`analyze`, ~6000 reserved completion tokens
+plus prompt tokens) exceeds this account's free-tier throughput cap (8000 tokens/minute, shared
+account-wide across models — confirmed with both `openai/gpt-oss-120b` and `openai/gpt-oss-20b`,
+same limit) by a small margin; see `docs/decisions.md` item 21. **Anthropic has never talked to a
+real API** (no key) and is still mock-server-only. Redo this checklist for a new model id, or for
+Anthropic, and write down what you find.
 
 ## Setup
 
-Pick one provider (or run this whole checklist twice, once per provider — they are independent
-code paths and a bug in one says nothing about the other).
+Pick one provider (or run this whole checklist multiple times, once per provider — they are
+independent code paths and a bug in one says nothing about the others).
 
 ```bash
 # Anthropic
@@ -20,14 +25,19 @@ export READYSPEC_MODEL=claude-sonnet-5   # optional
 export GEMINI_API_KEY=...                # PowerShell: $env:GEMINI_API_KEY = "..."  (GOOGLE_API_KEY also works)
 export READYSPEC_MODEL=gemini-3.6-flash  # optional
 
+# Groq (free tier, no card: https://console.groq.com/keys)
+export GROQ_API_KEY=...                     # PowerShell: $env:GROQ_API_KEY = "..."
+export READYSPEC_MODEL=openai/gpt-oss-120b  # optional
+
 # Either way, optional: your model's price, so cost is computed instead of shown as unknown
 export READYSPEC_PRICE_IN_PER_MTOK=...
 export READYSPEC_PRICE_OUT_PER_MTOK=...
 ```
 
-If both keys happen to be set, Anthropic is used unless you also set
-`READYSPEC_PROVIDER=gemini`. The key stays server-side. It is never sent to the browser, never
-logged, and error text is redacted.
+If more than one key is set, priority is Anthropic > Gemini > Groq unless you also set
+`READYSPEC_PROVIDER=anthropic|gemini|groq` explicitly (needed if, say, a Gemini key is set but its
+quota is exhausted and you want to force Groq). The key stays server-side. It is never sent to the
+browser, never logged, and error text is redacted.
 
 ## 1. Smoke test
 
@@ -50,6 +60,8 @@ demonstration ticket without error. It prints the questions, citation counts and
 | (Gemini) `429 ... exceeded your current quota` | Free-tier rate/quota limit, not a code bug; the session fails as **recoverable** with decisions and evidence kept — wait for the quota to reset (often per-minute or per-day) and click **Resume**, or check https://ai.google.dev/gemini-api/docs/rate-limits |
 | (Anthropic) `Model API returned 400: ... tool` | JSON Schema the API rejects (check `generate.ts` schema export) |
 | (Anthropic) `Model returned no structured result` | Forced tool call not honoured for this model |
+| (Groq) `429 ... tokens per minute (TPM)` | Free-tier throughput limit; `generate.ts` now honours the `retry-after` header Groq sends (docs/decisions.md 21), so a single slow-down usually self-heals on retry |
+| (Groq) `413 ... Request too large ... TPM` | The single request's prompt + reserved completion tokens already exceed the whole per-minute budget (8000 tokens on this account) — no retry helps; confirmed live with both `openai/gpt-oss-120b` and `openai/gpt-oss-20b` on the `analyze` stage against even the small demo repo. Not a code bug: a real free-tier ceiling. A smaller ticket/repo, a paid Dev Tier (linked in the error message), or a different account may fit |
 | `gave up after 3 attempts (schema validation failed ...)` | Model output does not fit a stage schema; read the retry warnings |
 
 ## 2. UI run
@@ -71,6 +83,8 @@ demonstration ticket without error. It prints the questions, citation counts and
 npm run eval -- --provider anthropic --set dev --repeat 3
 # or
 npm run eval -- --provider gemini --set dev --repeat 3
+# or
+npm run eval -- --provider groq --set dev --repeat 3
 ```
 
 **Not yet run for either provider** (see `evals/REPORT.md`). Roughly four calls per case per system

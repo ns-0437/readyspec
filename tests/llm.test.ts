@@ -4,10 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { AnthropicProvider } from "@/server/llm/anthropic";
 import { GeminiProvider } from "@/server/llm/gemini";
+import { GroqProvider } from "@/server/llm/groq";
 import { Budget, costUsd, limitsFromEnv } from "@/server/llm/budget";
 import { createProvider } from "@/server/llm";
-import { extractJson, generateStructured, StageError } from "@/server/llm/generate";
-import { BudgetExceededError, CancelledError, ProviderError, type LlmProvider, type LlmRequest, type LlmResponse } from "@/server/llm/provider";
+import { computeRetryWaitMs, extractJson, generateStructured, StageError } from "@/server/llm/generate";
+import { BudgetExceededError, CancelledError, ProviderError, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "@/server/llm/provider";
 import { renderEvidence } from "@/server/llm/prompts";
 import { buildEvidence } from "@/server/repository/evidence";
 import { createSnapshot } from "@/server/repository/snapshot";
@@ -68,6 +69,20 @@ describe("generateStructured", () => {
     const dead = scripted([new ProviderError("503", { retryable: true, status: 503 })]);
     await expect(run(dead, { maxRetries: 2 })).rejects.toThrow(StageError);
     expect(dead.calls).toHaveLength(3);
+  });
+
+  it("waits at least as long as a provider's Retry-After before retrying (Groq's TPM window undershoots the default backoff live, docs/decisions.md 21)", async () => {
+    const flaky = scripted([new ProviderError("rate limited", { retryable: true, status: 429, retryAfterMs: 80 }), ok({ n: 5 })]);
+    const start = Date.now();
+    expect((await run(flaky, { backoffMs: 1 })).n).toBe(5);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(75); // small tolerance for timer slop
+  });
+
+  it("computeRetryWaitMs takes the larger of backoff and Retry-After, capped so one bad header can't stall a job for hours", () => {
+    expect(computeRetryWaitMs(600, 0, null)).toBe(600);
+    expect(computeRetryWaitMs(600, 0, 80)).toBe(600); // backoff already covers a short Retry-After
+    expect(computeRetryWaitMs(600, 0, 22_000)).toBe(22_000); // real Groq value, undershoots default backoff badly
+    expect(computeRetryWaitMs(600, 0, 10_000_000)).toBe(90_000); // capped
   });
 
   it("does not retry non-retryable provider errors", async () => {
@@ -142,18 +157,43 @@ describe("budget and configuration", () => {
     expect(createProvider({ ANTHROPIC_API_KEY: "sk-ant-test-key-123456789012345" }).info.kind).toBe("anthropic");
     expect(createProvider({ GEMINI_API_KEY: "test-gemini-key" }).info.kind).toBe("gemini");
     expect(createProvider({ GOOGLE_API_KEY: "test-google-key" }).info.kind).toBe("gemini");
-    // Both set and no explicit choice: Anthropic wins (documented order), never a silent third state.
+    expect(createProvider({ GROQ_API_KEY: "test-groq-key" }).info.kind).toBe("groq");
+    // All set and no explicit choice: Anthropic wins (documented order), never a silent third state.
     expect(createProvider({ ANTHROPIC_API_KEY: "a", GEMINI_API_KEY: "g" }).info.kind).toBe("anthropic");
+    expect(createProvider({ GEMINI_API_KEY: "g", GROQ_API_KEY: "q" }).info.kind).toBe("gemini");
     expect(createProvider({ READYSPEC_PROVIDER: "gemini", ANTHROPIC_API_KEY: "a", GEMINI_API_KEY: "g" }).info.kind).toBe("gemini");
+    // The case this ordering exists for: a Gemini key is set but exhausted, force Groq explicitly.
+    expect(createProvider({ READYSPEC_PROVIDER: "groq", GEMINI_API_KEY: "g", GROQ_API_KEY: "q" }).info.kind).toBe("groq");
     expect(createProvider({ READYSPEC_PROVIDER: "fixture", ANTHROPIC_API_KEY: "k" }).info.kind).toBe("fixture");
     expect(() => createProvider({ READYSPEC_PROVIDER: "anthropic" })).toThrow(/ANTHROPIC_API_KEY/);
     expect(() => createProvider({ READYSPEC_PROVIDER: "gemini" })).toThrow(/GEMINI_API_KEY/);
+    expect(() => createProvider({ READYSPEC_PROVIDER: "groq" })).toThrow(/GROQ_API_KEY/);
     expect(() => createProvider({ READYSPEC_PROVIDER: "openai" })).toThrow(/Unknown READYSPEC_PROVIDER/);
   });
 
   it("READYSPEC_MODEL overrides whichever provider is selected", () => {
     expect(createProvider({ ANTHROPIC_API_KEY: "a", READYSPEC_MODEL: "claude-custom" }).info.model).toBe("claude-custom");
     expect(createProvider({ GEMINI_API_KEY: "g", READYSPEC_MODEL: "gemini-custom" }).info.model).toBe("gemini-custom");
+    expect(createProvider({ GROQ_API_KEY: "q", READYSPEC_MODEL: "groq-custom" }).info.model).toBe("groq-custom");
+  });
+});
+
+describe("parseRetryAfterMs", () => {
+  it("parses a delay-seconds value", () => {
+    expect(parseRetryAfterMs("22")).toBe(22_000);
+    expect(parseRetryAfterMs("0")).toBe(0);
+  });
+
+  it("parses an HTTP-date value as time remaining", () => {
+    const future = new Date(Date.now() + 5000).toUTCString();
+    expect(parseRetryAfterMs(future)).toBeGreaterThan(0);
+    expect(parseRetryAfterMs(future)).toBeLessThanOrEqual(5000);
+  });
+
+  it("returns null for a missing or unparseable header, never negative", () => {
+    expect(parseRetryAfterMs(null)).toBeNull();
+    expect(parseRetryAfterMs("not-a-header")).toBeNull();
+    expect(parseRetryAfterMs("-5")).toBe(0);
   });
 });
 
@@ -366,6 +406,110 @@ describe("GeminiProvider (mock HTTP server)", () => {
 
   it("reports network failure as retryable", async () => {
     const dead = new GeminiProvider({ apiKey: KEY, model: "m", baseUrl: "http://127.0.0.1:1" });
+    await expect(dead.complete(req())).rejects.toMatchObject({ name: "ProviderError", retryable: true });
+  });
+
+  it("maps a caller abort to CancelledError", async () => {
+    mode = "ok";
+    const ctl = new AbortController();
+    ctl.abort();
+    await expect(provider().complete({ ...req(), signal: ctl.signal })).rejects.toBeInstanceOf(CancelledError);
+  });
+});
+
+/* ---- Groq adapter against a local mock server (no network, no real key) ---- */
+
+describe("GroqProvider (mock HTTP server)", () => {
+  let server: http.Server;
+  let base: string;
+  let last: { url: string; headers: http.IncomingHttpHeaders; body: Record<string, unknown> } | null = null;
+  let mode: "ok" | "429" | "401" | "bad" | "refusal" | "empty" = "ok";
+  const KEY = "groq-test-SECRETKEY-0123456789abcdef";
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", (c) => (data += c));
+      req.on("end", () => {
+        last = { url: req.url ?? "", headers: req.headers, body: JSON.parse(data) as Record<string, unknown> };
+        const send = (status: number, obj: unknown) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+        if (mode === "429") { res.writeHead(429, { "content-type": "application/json", "retry-after": "22" }); return res.end(JSON.stringify({ error: { message: "slow down" } })); }
+        if (mode === "401") return send(401, { error: { message: `invalid key ${KEY}` } });
+        if (mode === "bad") return send(200, { nope: true });
+        if (mode === "refusal") return send(200, { choices: [{ message: { content: null, refusal: "cannot help with that" }, finish_reason: "stop" }] });
+        if (mode === "empty") return send(200, { choices: [{ message: { content: "" }, finish_reason: "length" }] });
+        send(200, { choices: [{ message: { content: '{"n":7}' }, finish_reason: "stop" }], usage: { prompt_tokens: 11, completion_tokens: 3 } });
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+  afterAll(() => new Promise<void>((r) => server.close(() => r())));
+
+  const req = (): LlmRequest => ({
+    stage: "analyze", system: "SYS", user: "USER", schemaName: "The Result! Schema",
+    jsonSchema: { type: "object", properties: { n: { type: "number" } } },
+    maxOutputTokens: 123,
+  });
+  const provider = () => new GroqProvider({ apiKey: KEY, model: "groq-test", baseUrl: base });
+
+  it("sends the key as a bearer token (not the URL), requests a json_schema response, and parses usage", async () => {
+    mode = "ok";
+    const res = await provider().complete(req());
+    expect(JSON.parse(res.text)).toEqual({ n: 7 });
+    expect(res.usage).toEqual({ inputTokens: 11, outputTokens: 3 });
+    expect(last!.headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(last!.url).not.toContain(KEY);
+    expect(last!.url).toContain("/chat/completions");
+    expect(last!.body).toMatchObject({ model: "groq-test", max_completion_tokens: 123 });
+    expect(last!.body.messages).toEqual([{ role: "system", content: "SYS" }, { role: "user", content: "USER" }]);
+    const format = last!.body.response_format as { type: string; json_schema: { name: string; strict: boolean; schema: unknown } };
+    expect(format.type).toBe("json_schema");
+    expect(format.json_schema.strict).toBe(false);
+    expect(format.json_schema.schema).toEqual(req().jsonSchema);
+    expect(JSON.stringify(last!.body)).not.toContain(KEY);
+  });
+
+  it("sanitizes the schema name to Groq's allowed character set", async () => {
+    mode = "ok";
+    await provider().complete(req());
+    const format = last!.body.response_format as { json_schema: { name: string } };
+    expect(format.json_schema.name).toBe("The_Result__Schema");
+  });
+
+  it("never sends stage context (only rendered prompts) to the API", async () => {
+    mode = "ok";
+    await provider().complete({ ...req(), context: { secretFixtureOnlyThing: "LEAK-CHECK" } });
+    expect(JSON.stringify(last!.body)).not.toContain("LEAK-CHECK");
+  });
+
+  it("classifies 429 as retryable and 401 as not, without echoing the key, and carries Groq's Retry-After", async () => {
+    mode = "429";
+    await expect(provider().complete(req())).rejects.toMatchObject({ name: "ProviderError", retryable: true, status: 429, retryAfterMs: 22_000 });
+    mode = "401";
+    const err = await provider().complete(req()).catch((e: Error) => e);
+    expect(err).toMatchObject({ retryable: false, status: 401 });
+    expect((err as Error).message).not.toContain("SECRETKEY-0123456789abcdef");
+    expect((err as Error).message).toContain("[REDACTED]");
+  });
+
+  it("treats a refusal as retryable and surfaces the refusal text", async () => {
+    mode = "refusal";
+    await expect(provider().complete(req())).rejects.toMatchObject({ retryable: true, message: expect.stringContaining("cannot help with that") });
+  });
+
+  it("treats empty content from hitting the length limit as retryable", async () => {
+    mode = "empty";
+    await expect(provider().complete(req())).rejects.toMatchObject({ retryable: true, message: expect.stringContaining("length") });
+  });
+
+  it("rejects malformed responses as non-retryable", async () => {
+    mode = "bad";
+    await expect(provider().complete(req())).rejects.toMatchObject({ retryable: false });
+  });
+
+  it("reports network failure as retryable", async () => {
+    const dead = new GroqProvider({ apiKey: KEY, model: "m", baseUrl: "http://127.0.0.1:1" });
     await expect(dead.complete(req())).rejects.toMatchObject({ name: "ProviderError", retryable: true });
   });
 

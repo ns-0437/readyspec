@@ -7,17 +7,23 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 179 tests, production build, and the UI driven
+Milestones 1-5 built and checked: lint, typecheck, 193 tests, production build, and the UI driven
 end to end in a browser. **Gemini (`gemini-3.6-flash`) is validated live** as of 2026-09-22: full
 staged pipeline completed via `npm run smoke:live` and separately through the real browser UI;
 three real schema-compatibility bugs were found from live 400s and fixed (docs/decisions.md 14) —
 the mock-server tests, written from documentation-level guesses, missed all three, which is exactly
-why "not validated" belonged in this file before now. **Still NOT done:** (1) Anthropic has never
-run against a real API (no credentials), still mock-server-only, and (2) no model-dependent
-benchmark result exists (`npm run eval` against a real provider needs dozens of calls and has not
-been run). Everything that runs by default (no key) uses the labelled fixture provider (scripted
-output). Benchmark: retrieval + static checklist are real; see evals/REPORT.md for what is and is
-not measured.
+why "not validated" belonged in this file before now. **A third provider, Groq, was added
+2026-09-25** (free tier, OpenAI-compatible, `src/server/llm/groq.ts`): live-tested with a real key,
+its single structured call passes cleanly, but the staged pipeline's `analyze` stage exceeds this
+account's Groq free-tier throughput (8000 tokens/minute, account-wide) by a small margin — a real
+free-tier ceiling, not a code bug (docs/decisions.md 21). Chasing it found and fixed a genuine,
+provider-agnostic bug: retry backoff ignored a provider's `Retry-After` header, now honoured by all
+three adapters. **Still NOT done:** (1) Anthropic has never run against a real API (no credentials),
+still mock-server-only, and (2) no model-dependent benchmark result exists end-to-end for any
+provider (`npm run eval` needs dozens of calls; Gemini hit quota, Groq hits its throughput ceiling
+on the `analyze` stage). Everything that runs by default (no key) uses the labelled fixture provider
+(scripted output). Benchmark: retrieval + static checklist are real; see evals/REPORT.md for what is
+and is not measured.
 
 ## Purpose, user, scope
 
@@ -35,8 +41,8 @@ not measured.
 
 TypeScript, Next.js 16 (app router), `node:sqlite` (built in; loaded with
 `process.getBuiltinModule` so bundlers ignore it; Node >= 22.13), Zod 4, Vitest, tsx.
-Model adapters behind `src/server/llm/provider.ts`; Anthropic and Gemini, both via plain `fetch`
-(no vendor SDKs), selected by `createProvider()`. A session pins one provider for its lifetime.
+Model adapters behind `src/server/llm/provider.ts`; Anthropic, Gemini and Groq, all via plain
+`fetch` (no vendor SDKs), selected by `createProvider()`. A session pins one provider for its lifetime.
 
 - `src/shared` — Zod schemas, pure helpers (trace, brief-edit, redact). No I/O.
 - `src/server/repository` — snapshot, safe file access, filters, search, evidence. No model calls.
@@ -84,7 +90,7 @@ long files; prefer the Write/Edit tools for source with regexes.
 - `src/shared/schemas.ts` — every Zod schema/type (evidence, analysis, questions, brief, verification, session, API bodies, baseline output).
 - `src/shared/{redact,trace,brief-edit}.ts` — secret patterns; criterion traceability; pure draft-editing ops.
 - `src/server/repository/` — `safe-fs` (root/allowlist/traversal), `filters` (exclusions, injection heuristics), `snapshot`, `symbols`, `search` (BM25 + symbol hops + test-file pairing, decisions.md 16), `evidence` (ids, hashing, verification), `inspect`, `discover`, `types`.
-- `src/server/llm/` — `provider` (interfaces, errors), `anthropic`, `gemini`, `fixture/` (scripted demo + mechanical fallback), `generate` (retries/validation/cancel), `budget`, `contexts`, `prompts/`, `index` (provider selection: explicit `READYSPEC_PROVIDER` wins; else key presence, Anthropic preferred if both set; else fixture).
+- `src/server/llm/` — `provider` (interfaces, errors, `Retry-After` parsing), `anthropic`, `gemini`, `groq`, `fixture/` (scripted demo + mechanical fallback), `generate` (retries/validation/cancel, provider-aware backoff), `budget`, `contexts`, `prompts/`, `index` (provider selection: explicit `READYSPEC_PROVIDER` wins; else key presence, Anthropic > Gemini > Groq; else fixture).
 - `src/server/workflow/` — `investigate` (stages 1-2 + disclosure), `stages` (analyze/clarify/brief/judge), `verify` + `support` (stage 6), `service` (session state machine, jobs), `export` (Markdown, JSON, GitHub-issue-shaped, decisions.md 17), `errors`.
 - `src/server/persistence/` — `db` (schema), `store` (typed access).
 - `src/app/` — `page.tsx`, `sessions/[id]/page.tsx`, `api/**/route.ts`.
@@ -102,7 +108,7 @@ long files; prefer the Write/Edit tools for source with regexes.
 
 ```
 npm install
-npm run dev            # http://localhost:3000 (fixture provider unless ANTHROPIC_API_KEY or GEMINI_API_KEY set)
+npm run dev            # http://localhost:3000 (fixture provider unless ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY set)
 npm run lint           # eslint
 npm run typecheck      # tsc for app + fixtures
 npm test               # vitest
@@ -111,21 +117,25 @@ npm run check          # lint + typecheck + test
 npm run build          # production build
 npm run eval -- --provider fixture --set dev   # benchmark; --repeat N for variance; --set heldout-v2 ONCE after code freeze (v1 is contaminated)
 npm run eval:regression                        # deterministic retrieval-only regression check against evals/baseline-retrieval.json
-npm run smoke:live     # first-contact live check (needs ANTHROPIC_API_KEY or GEMINI_API_KEY); see docs/live-validation.md
+npm run smoke:live     # first-contact live check (needs ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY); see docs/live-validation.md
 ```
 
-Config (env): `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`),
-`READYSPEC_PROVIDER=fixture|anthropic|gemini`, `READYSPEC_MODEL` (default `claude-sonnet-5` /
-`gemini-3.6-flash`), `ANTHROPIC_BASE_URL`/`GEMINI_BASE_URL` (testing only),
+Config (env): `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `GROQ_API_KEY` (free
+tier, no card: https://console.groq.com/keys),
+`READYSPEC_PROVIDER=fixture|anthropic|gemini|groq`, `READYSPEC_MODEL` (default `claude-sonnet-5` /
+`gemini-3.6-flash` / `openai/gpt-oss-120b`), `ANTHROPIC_BASE_URL`/`GEMINI_BASE_URL`/`GROQ_BASE_URL` (testing only),
 `READYSPEC_ALLOWED_ROOTS` (path-delimited; fixtures always allowed), `READYSPEC_DB`,
 `READYSPEC_MAX_CALLS|MAX_INPUT_TOKENS|MAX_OUTPUT_TOKENS|MAX_COST_USD`,
 `READYSPEC_PRICE_IN_PER_MTOK|PRICE_OUT_PER_MTOK` (no prices are hard-coded).
 
 ## Known limitations
 
-- Neither live model (Anthropic, Gemini) ever exercised against a real API (see Status).
-- Gemini's `responseSchema` support is a restricted subset of JSON Schema; `toGeminiSchema` strips
-  known-unsupported keywords, but this is unverified against the live API (docs/decisions.md 14).
+- Anthropic has never been exercised against a real API (see Status); Gemini and Groq have, but
+  neither has completed a full model-dependent benchmark run end-to-end (Gemini: quota exhausted;
+  Groq: this account's 8000 tokens/minute throughput ceiling, docs/decisions.md 21).
+- Groq's free tier here caps at 8000 tokens/minute account-wide (not per-model): a single `analyze`
+  call against even the small demo repository can exceed it, and no retry strategy fixes that case
+  (only the 429/rate-limited case, which now honours `Retry-After`, docs/decisions.md 21).
 - Retrieval is lexical + symbol-aware; symbol extraction is regex-based (TS/JS/Py/Md), not a parser.
 - Follow-up rounds re-retrieve from ticket + answers; new excerpts (>=2 answer-introduced terms) need a second consent.
 - Retrieval precision: 52.5% dev / 48% held-out v2 (recall 97.1% dev / 100% held-out v2, small samples); one dev
@@ -137,8 +147,8 @@ Config (env): `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`),
 
 ## Next actions
 
-See docs/roadmap.md (ordered). Top item: run docs/live-validation.md with a real key (Anthropic or Gemini
-— both adapters exist now). Repo is public at https://github.com/ns-0437/readyspec (branch main; CI on
+See docs/roadmap.md (ordered). Top item: run docs/live-validation.md with a real key (Anthropic, Gemini
+or Groq — all three adapters exist now). Repo is public at https://github.com/ns-0437/readyspec (branch main; CI on
 push). Retrieval changes after the heldout-v2 run contaminate it: write a v3 cohort first.
 
 ## Maintenance rule

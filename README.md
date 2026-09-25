@@ -25,10 +25,11 @@ about existing behavior points at code; every proposed change connects to a requ
 | Works and is tested | Not done / not validated |
 |---|---|
 | Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **Anthropic has never run against a real API** (no key). Only tested against a local mock server. |
-| **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | **No model-quality benchmark result exists yet.** The harness, 30 cases (four fixture repositories, one now larger than the retrieval budget) and human rubric are ready; `npm run eval` against a real provider has not been run (needs dozens of calls) |
+| **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | Gemini's own free-tier quota is exhausted, so no full run has completed twice |
+| **Groq live-tested** (`openai/gpt-oss-120b`, free tier): auth, schema handling and error classification all confirmed against the real API — see [docs/decisions.md](docs/decisions.md) item 21 | This account's Groq free tier caps at 8000 tokens/minute account-wide, which a single `analyze` call can already exceed — no benchmark run has completed on it yet either |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 179 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
-| Deterministic retrieval and static-checklist benchmark results | Model-quality result needs a working live provider (see below) |
+| 193 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
+| Deterministic retrieval and static-checklist benchmark results | **No model-quality benchmark result exists yet** for any provider (needs dozens of calls; every provider tried so far hit a real free-tier or availability limit) |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
 mechanical elsewhere. It is labelled in the UI, in the brief, in exports and in evaluation reports.
@@ -98,17 +99,18 @@ A 90-second walkthrough is in [docs/demo.md](docs/demo.md).
 
 ### Use a real model
 
-Set a key for **either** provider — Anthropic and Gemini are both supported behind the same
-adapter interface (`LlmProvider`); if both keys are set, Anthropic is used unless
-`READYSPEC_PROVIDER` says otherwise.
+Set a key for **any one** provider — Anthropic, Gemini and Groq are all supported behind the same
+adapter interface (`LlmProvider`); if more than one key is set, priority is Anthropic > Gemini >
+Groq unless `READYSPEC_PROVIDER` says otherwise. Groq's free tier needs no card:
+[console.groq.com/keys](https://console.groq.com/keys).
 
 ```bash
-export ANTHROPIC_API_KEY=...   # or: export GEMINI_API_KEY=...  (GOOGLE_API_KEY also works)
+export ANTHROPIC_API_KEY=...   # or: export GEMINI_API_KEY=... (GOOGLE_API_KEY also works) or export GROQ_API_KEY=...
 npm run smoke:live             # first-contact check; see docs/live-validation.md
 npm run dev
 ```
 
-(PowerShell: `$env:ANTHROPIC_API_KEY = "..."` / `$env:GEMINI_API_KEY = "..."`)
+(PowerShell: `$env:ANTHROPIC_API_KEY = "..."` / `$env:GEMINI_API_KEY = "..."` / `$env:GROQ_API_KEY = "..."`)
 
 The key stays server-side. When a real model is used, the excerpts listed on the consent screen
 (and your ticket) are sent to that provider; nothing else from the repository is.
@@ -126,9 +128,10 @@ Copy `.env.example` to `.env.local`. All optional.
 |---|---|---|
 | `ANTHROPIC_API_KEY` | unset | Enables the Anthropic provider |
 | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | unset | Enables the Gemini provider |
-| `READYSPEC_PROVIDER` | `anthropic` if that key is set, else `gemini` if that key is set, else `fixture` | Force a specific provider |
-| `READYSPEC_MODEL` | `claude-sonnet-5` (Anthropic) / `gemini-3.6-flash` (Gemini) | Model id for whichever provider is selected |
-| `ANTHROPIC_BASE_URL` / `GEMINI_BASE_URL` | provider default | Override the API host (testing only) |
+| `GROQ_API_KEY` | unset | Enables the Groq provider (free tier, no card) |
+| `READYSPEC_PROVIDER` | `anthropic` if that key is set, else `gemini`, else `groq`, else `fixture` | Force a specific provider |
+| `READYSPEC_MODEL` | `claude-sonnet-5` (Anthropic) / `gemini-3.6-flash` (Gemini) / `openai/gpt-oss-120b` (Groq) | Model id for whichever provider is selected |
+| `ANTHROPIC_BASE_URL` / `GEMINI_BASE_URL` / `GROQ_BASE_URL` | provider default | Override the API host (testing only) |
 | `READYSPEC_MAX_CALLS` | 14 | Model calls per session (retries count) |
 | `READYSPEC_MAX_INPUT_TOKENS` / `READYSPEC_MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |
 | `READYSPEC_MAX_COST_USD` | unset | Cost ceiling (needs prices) |
@@ -199,7 +202,7 @@ npm run test:fixtures  # the fixture repositories' own tests (node --test)
 npm run check          # lint + typecheck + test
 npm run eval -- --provider fixture --set dev            # benchmark; add --repeat N for variance
 npm run eval:regression                                 # deterministic retrieval-only check vs. evals/baseline-retrieval.json
-npm run smoke:live                                      # needs ANTHROPIC_API_KEY or GEMINI_API_KEY
+npm run smoke:live                                      # needs ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY
 ```
 
 CI runs lint, typecheck, tests, fixture tests, the deterministic benchmark and the build on every push.

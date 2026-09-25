@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ProviderInfo } from "@/shared/schemas";
 import { redactSecrets } from "@/shared/redact";
-import { CancelledError, ProviderError, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
+import { CancelledError, ProviderError, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
 
 const AnthropicResponse = z.object({
   content: z.array(z.object({ type: z.string(), name: z.string().optional(), input: z.unknown().optional(), text: z.string().optional() })),
@@ -76,7 +76,7 @@ export class AnthropicProvider implements LlmProvider {
         /* ignore */
       }
       const retryable = res.status === 429 || res.status >= 500;
-      throw new ProviderError(`Model API returned ${res.status}${detail ? `: ${detail}` : ""}`, { retryable, status: res.status });
+      throw new ProviderError(`Model API returned ${res.status}${detail ? `: ${detail}` : ""}`, { retryable, status: res.status, retryAfterMs: parseRetryAfterMs(res.headers.get("retry-after")) });
     }
 
     const parsed = AnthropicResponse.safeParse(await res.json());

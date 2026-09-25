@@ -63,6 +63,18 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     });
   });
 
+const MAX_RETRY_WAIT_MS = 90_000;
+
+/**
+ * A provider that says exactly how long to wait (e.g. a per-minute token-rate 429) knows better
+ * than a fixed exponential backoff, which was sized for generic transient errors and can be far
+ * shorter than an actual rate-limit window (seen live with Groq: docs/decisions.md 21). Capped so
+ * one bad header can't stall a job far longer than any real rate-limit window we've seen.
+ */
+export function computeRetryWaitMs(backoffMs: number, attempt: number, retryAfterMs: number | null): number {
+  return Math.min(Math.max(backoffMs * 2 ** attempt, retryAfterMs ?? 0), MAX_RETRY_WAIT_MS);
+}
+
 /**
  * One structured model call with: budget precheck, cancellation, bounded retries (transient
  * provider errors and schema-validation failures), and Zod validation of the result.
@@ -111,8 +123,9 @@ export async function generateStructured<T>(opts: GenerateOptions<T>): Promise<T
       if (opts.signal?.aborted) throw new CancelledError();
       if (e instanceof ProviderError && e.retryable && attempt < maxRetries) {
         lastProblem = redactSecrets(e.message);
-        opts.onEvent?.("warn", `${opts.stage}: transient provider error (${lastProblem}); retry ${attempt + 1}/${maxRetries}`);
-        await sleep(backoff * 2 ** attempt, opts.signal);
+        const wait = computeRetryWaitMs(backoff, attempt, e.retryAfterMs);
+        opts.onEvent?.("warn", `${opts.stage}: transient provider error (${lastProblem}); retry ${attempt + 1}/${maxRetries} in ${wait}ms`);
+        await sleep(wait, opts.signal);
         continue;
       }
       if (e instanceof ProviderError) throw new StageError(redactSecrets(e.message), e.retryable);

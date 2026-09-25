@@ -1,6 +1,6 @@
 /**
  * Benchmark runner.
- *   npm run eval -- [--provider fixture|anthropic] [--set dev|heldout|all] [--systems checklist,single,staged] [--cases id,id]
+ *   npm run eval -- [--provider fixture|anthropic|gemini|groq] [--set dev|heldout|all] [--systems checklist,single,staged] [--cases id,id]
  * Results: evals/results/<provider>-<set>-<timestamp>.json and <provider>-<set>-latest.md
  *
  * With the fixture provider, every metric that depends on model output is reported as n/a. Only
@@ -71,7 +71,7 @@ async function main() {
   const base = `${provider.info.kind}-${set}`;
   fs.writeFileSync(path.join(RESULTS_DIR, `${base}-${stamp}.json`), JSON.stringify({ provider: provider.info, set, cases: cases.map((c) => c.id), aggs, scores, outputs }, null, 2));
   fs.writeFileSync(path.join(RESULTS_DIR, `${base}-latest.md`), report);
-  if (provider.info.kind === "anthropic") fs.writeFileSync(path.join(RESULTS_DIR, `human-scoring-sheet-${set}.csv`), humanSheet(cases, systems));
+  if (provider.info.kind !== "fixture") fs.writeFileSync(path.join(RESULTS_DIR, `human-scoring-sheet-${set}.csv`), humanSheet(cases, systems));
   console.log("\n" + report);
 }
 

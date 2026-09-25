@@ -3,20 +3,24 @@
 Ordered by how much each item reduces the biggest uncertainty. The biggest one is simple: **nobody
 has yet seen this run against a real model.** Everything else is secondary to that.
 
-## 1. Validate the live path (needs `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`) — do first
+## 1. Validate the live path (needs `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `GROQ_API_KEY`) — do first
 
 Steps and pass criteria: [live-validation.md](live-validation.md).
 
 1. ✅ `npm run smoke:live` — **done for Gemini** 2026-09-22 (`gemini-3.6-flash`): full staged run
-   passed after fixing three real schema bugs found from live 400s (docs/decisions.md 14). Not
-   done for Anthropic (no key).
+   passed after fixing three real schema bugs found from live 400s (docs/decisions.md 14).
+   **Attempted for Groq** 2026-09-25 (`openai/gpt-oss-120b`): the single structured call passes
+   cleanly, but the staged pipeline's `analyze` stage exceeds this account's free-tier throughput
+   (8000 tokens/minute, account-wide) by a small margin — a real limit, not a code bug
+   (docs/decisions.md 21). Not done for Anthropic (no key).
 2. ✅ Run the demo ticket in the UI against the real model — **done for Gemini**: investigate through
    clarify worked correctly (specific questions, ignored the planted prompt-injection doc); the
    brief call then hit a real `429` quota limit, which the app handled correctly (recoverable,
-   resumable, nothing lost). Not done for Anthropic.
-3. `npm run eval -- --provider anthropic --set dev --repeat 3` (or `--provider gemini`) to see
-   variance — **not yet run for either provider.** Needs the Gemini quota to reset (or a paid tier)
-   before trying that provider again.
+   resumable, nothing lost). Not done for Groq (same throughput ceiling as step 1) or Anthropic.
+3. `npm run eval -- --provider anthropic --set dev --repeat 3` (or `--provider gemini` /
+   `--provider groq`) to see variance — **not yet run for any provider.** Gemini needs its quota to
+   reset (or a paid tier); Groq needs either a smaller prompt footprint per call or its paid Dev
+   Tier; Anthropic needs a key.
 4. Human-score with [the rubric](../evals/rubrics/human-rubric.md), ideally blind and by someone else.
 5. Freeze the code, run `--set heldout-v2` once (the only clean cohort left), and replace the "not measured" table in
    [evals/REPORT.md](../evals/REPORT.md) with real numbers, failures included.

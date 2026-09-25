@@ -5,8 +5,10 @@ implementation, with code-backed evidence and a benchmark against simpler approa
 
 Prep: `npm run dev`, open http://localhost:3000. With no API key the app runs the fixture provider
 and says so in a banner. Say so in the recording too: the demo shows the product and its
-guardrails, not model quality. If you have a key, set `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` first and the same flow
-runs against the real model (not yet validated by the author; see README).
+guardrails, not model quality. If you have a key, set `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or
+`GROQ_API_KEY` (free tier, no card) first and the same flow runs against the real model — Gemini
+and Groq have both been live-validated for the mechanics shown here (see README status for exactly
+what that did and didn't prove; Anthropic has no key yet).
 
 | Time | Do | Say |
 |---|---|---|
@@ -17,6 +19,6 @@ runs against the real model (not yet validated by the author; see README).
 | 0:55 | Brief appears. Point at the four labelled kinds, then the Verification card: citations valid, criteria tested. | "Observed, proposed, assumed, unresolved, never blurred. Every claim about existing code cites lines in a pinned snapshot." |
 | 1:05 | Click an acceptance criterion. | "The signature interaction: evidence, affected components and the proposed test, together. Blocked criteria show which question is still open." |
 | 1:15 | Edit a criterion; **Save and re-verify**. Delete a test from a criterion and show the verification error blocking approval. | "Edits re-verify. Approval needs a passing check, a named reviewer, and an acknowledgement of open questions." |
-| 1:25 | Export Markdown. Then show `evals/REPORT.md`. | "Markdown and JSON, fixture output labelled. And the benchmark report says exactly what has and has not been measured." |
+| 1:25 | Export Markdown, then point at the GitHub-issue export button. Then show `evals/REPORT.md`. | "Markdown, JSON, or task-list checkboxes ready to paste into an issue — fixture output labelled in all three. And the benchmark report says exactly what has and has not been measured." |
 
 Do not claim: model quality, reduced time to market, or anything about BetterMe's systems.

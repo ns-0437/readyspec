@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { contentOf, removeItem, removeScopeItem, setItemText, setScopeItem } from "@/shared/brief-edit";
+import { contentOf, removeItem, removeScopeItem, setItemText, setScopeItem, summarizeChanges } from "@/shared/brief-edit";
 import { traceCriterion } from "@/shared/trace";
 import type { Brief, EvidenceItem } from "@/shared/schemas";
 import { exportGithubIssue, exportJson, exportMarkdown } from "@/server/workflow/export";
@@ -54,6 +54,37 @@ describe("brief-edit helpers", () => {
   it("contentOf drops status, approval, revision and provenance", () => {
     const c = contentOf(brief) as Record<string, unknown>;
     for (const k of ["status", "approval", "revision", "producedBy"]) expect(k in c).toBe(false);
+  });
+
+  it("summarizeChanges reports nothing for an untouched draft", () => {
+    const c = contentOf(brief);
+    expect(summarizeChanges(c, c)).toEqual([]);
+  });
+
+  it("summarizeChanges distinguishes added, removed and edited-in-place list items", () => {
+    const c = contentOf(brief);
+    const crit = c.acceptanceCriteria[0]!;
+    const edited = setItemText(c, "acceptanceCriteria", crit.id, "New text");
+    expect(summarizeChanges(c, edited)).toEqual(["1 acceptance criterion edited"]);
+
+    const removed = removeItem(c, "acceptanceCriteria", crit.id);
+    // removeItem also strips the deleted criterion's id from every step/test that referenced it
+    // (brief-edit.ts's own cascade, so the draft stays structurally valid); summarizeChanges is
+    // expected to notice those knock-on edits too, not just the removal itself.
+    expect(summarizeChanges(c, removed)).toContain("1 acceptance criterion removed");
+
+    const added = { ...c, risks: [...c.risks, { id: "r-new", text: "New risk", severity: "low" as const, evidenceIds: [] }] };
+    expect(summarizeChanges(c, added)).toEqual(["1 risk added"]);
+  });
+
+  it("summarizeChanges pluralizes and flags title/outcome/scope text changes", () => {
+    const c = contentOf(brief);
+    const twoEdited = setItemText(setItemText(c, "assumptions", c.assumptions[0]!.id, "A"), "assumptions", c.assumptions[1]?.id ?? c.assumptions[0]!.id, "B");
+    if (c.assumptions.length >= 2) expect(summarizeChanges(c, twoEdited)).toEqual(["2 assumptions edited"]);
+
+    expect(summarizeChanges(c, { ...c, title: "New title" })).toEqual(["title edited"]);
+    expect(summarizeChanges(c, { ...c, requestedOutcome: "New outcome" })).toEqual(["requested outcome edited"]);
+    expect(summarizeChanges(c, setScopeItem(c, "inScope", 0, "X"))).toEqual(["in-scope list changed"]);
   });
 });
 

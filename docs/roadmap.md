@@ -76,7 +76,10 @@ past a single data point.
 
 ## 6. Product polish
 
-- Diff between brief revisions; show what an edit or a follow-up round changed.
+- ✅ Diff between brief revisions — partly done: `summarizeChanges()` in `src/shared/brief-edit.ts`
+  shows what the current unsaved edit changed (added/removed/edited-in-place, by list) next to the
+  "unsaved edits" banner (decisions.md 23). Still open: a real diff across *saved* revisions, which
+  needs a persisted revision history that doesn't exist yet.
 - Inline highlighting of the cited lines inside the excerpt when a claim or criterion is selected.
 - ✅ Export a GitHub-issue-shaped Markdown variant — done: `exportGithubIssue()` in
   `src/server/workflow/export.ts` (`?format=issue`), task-list checkboxes for criteria/steps/tests,

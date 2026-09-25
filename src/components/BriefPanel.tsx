@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { contentOf, removeItem, removeScopeItem, setItemText, setScopeItem, type ListKey } from "@/shared/brief-edit";
+import { contentOf, removeItem, removeScopeItem, setItemText, setScopeItem, summarizeChanges, type ListKey } from "@/shared/brief-edit";
 import type { BriefContent, SessionDetail, SupportResult } from "@/shared/schemas";
 import { KindBadge } from "./Badges";
 import { EvidenceChips } from "./EvidenceExplorer";
@@ -226,12 +226,15 @@ export function BriefPanel({ detail, busy, act, selectedCriterion, onSelectCrite
       </section>
 
       {dirty && (
-        <div className="card row sticky" style={{ justifyContent: "space-between" }}>
-          <span>You have unsaved edits.</span>
-          <span className="row">
-            <button className="btn" type="button" onClick={() => setDraft(null)} disabled={busy}>Discard</button>
-            <button className="btn primary" type="button" disabled={busy} onClick={() => act(async () => { await api.saveBrief(session.id, working, brief.revision); setDraft(null); })}>Save and re-verify</button>
-          </span>
+        <div className="card sticky" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span>You have unsaved edits.</span>
+            <span className="row">
+              <button className="btn" type="button" onClick={() => setDraft(null)} disabled={busy}>Discard</button>
+              <button className="btn primary" type="button" disabled={busy} onClick={() => act(async () => { await api.saveBrief(session.id, working, brief.revision); setDraft(null); })}>Save and re-verify</button>
+            </span>
+          </div>
+          <span className="small muted">{summarizeChanges(contentOf(brief), working).join("; ") || "no field-level changes detected"}</span>
         </div>
       )}
 

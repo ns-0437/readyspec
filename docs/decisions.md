@@ -290,3 +290,20 @@ This didn't surface during item 21's own testing only because a Gemini key happe
 in that environment -- with only a Groq key present, the script would print "No model key set" and
 exit before ever calling `createProvider()`, even though Groq was fully wired up and working. Fixed
 the guard and the file's docstring to include Groq.
+
+## 23. A scoped "what changed" summary instead of full revision diffs
+Roadmap item 6 asked for a "diff between brief revisions." Full revision history doesn't exist --
+only the current brief plus a `revision` counter is persisted, no history table -- so a real diff
+across saved revisions would mean a schema and persistence change, a bigger piece of work than
+this pass. What's already in memory in `BriefPanel` at edit time is smaller and immediately useful:
+the last-saved brief content and the in-progress draft, simultaneously, whenever `dirty` is true.
+Added `summarizeChanges()` (`src/shared/brief-edit.ts`), a pure function comparing two `BriefContent`
+values list-by-list (by id: added / removed / edited-in-place, where "edited" is a full-object
+comparison, not just the visible text field, so it also catches cascading changes like `removeItem`
+clearing a deleted criterion's id out of every step and test that referenced it) plus title,
+requested outcome and scope text. Wired into the existing "You have unsaved edits" banner as a
+second line, e.g. "1 acceptance criterion removed; 2 steps edited; 1 test edited" -- answers "did I
+mean to do that?" before saving, without needing any persistence change. Verified live through the
+UI (fixture provider): edited a criterion's text (showed "1 acceptance criterion edited"), then
+removed a different criterion and confirmed the summary correctly listed the removal alongside the
+steps/tests it cascaded into, not just the removal alone.

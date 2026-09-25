@@ -7,7 +7,7 @@
    budgets/retries/cancel, stages, clarification loop, brief generation. Gemini validated live
    2026-09-22 (decisions.md 14); Groq live-tested 2026-09-25, hits a free-tier throughput ceiling
    on the analyze stage (decisions.md 21); Anthropic still untested (no key).
-4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 193 tests, 30-case benchmark
+4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 200 tests, 30-case benchmark
    (17 dev, 7 held-out v1 contaminated, 6 held-out v2 clean), runner for three systems. Only deterministic
    results exist (evals/REPORT.md).
 5. **Finish** — README, report, demo script done. Remaining: a live-model run, human scoring.

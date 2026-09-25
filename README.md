@@ -28,7 +28,7 @@ about existing behavior points at code; every proposed change connects to a requ
 | **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | Gemini's own free-tier quota is exhausted, so no full run has completed twice |
 | **Groq live-tested** (`openai/gpt-oss-120b`, free tier): auth, schema handling and error classification all confirmed against the real API — see [docs/decisions.md](docs/decisions.md) item 21 | This account's Groq free tier caps at 8000 tokens/minute account-wide, which a single `analyze` call can already exceed — no benchmark run has completed on it yet either |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 193 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
+| 200 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
 | Deterministic retrieval and static-checklist benchmark results | **No model-quality benchmark result exists yet** for any provider (needs dozens of calls; every provider tried so far hit a real free-tier or availability limit) |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,

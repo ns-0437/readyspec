@@ -192,3 +192,21 @@ cap still applies on top. `npm run eval:regression`: recall unchanged (97.1%), p
 distractors/case 0.71 -> 0.59 -- a genuine improvement (measured against the original baseline, before item 16's
 own small dev-precision cost), so `evals/baseline-retrieval.json` was regenerated via `--write-baseline` rather
 than left at the old numbers.
+
+## 19. Two accessibility gaps from roadmap item 6
+1. **Focus order in the inspector.** `BriefPanel`'s acceptance-criteria list and `EvidenceExplorer`'s
+   `TraceInspector` live in separate columns of `Workspace`. Clicking a criterion made the inspector
+   appear at the top of the other column with no cue at all for a keyboard or screen-reader user --
+   only a sighted user glancing over would notice. `TraceInspector` (`EvidenceExplorer.tsx`) now takes
+   a ref and moves focus to itself (`tabIndex={-1}` + `.focus()`) whenever `trace.criterionId` changes,
+   the standard pattern for content that appears elsewhere on the page in response to an action.
+2. **Screen-reader labels on badges.** `ProviderBadge`'s fixture-provider badge ("▲ Fixture provider")
+   and the stepper's completed-step marker (`Workspace.tsx`, "✓ Investigate") read their decorative
+   glyphs aloud as literal characters, on top of text that already says the same thing. Wrapped both
+   glyphs in `aria-hidden` spans (matching the pattern `KindBadge` already used); for the stepper,
+   also added a `.sr-only` "(done)" suffix so completed-step status -- previously conveyed only by the
+   now-hidden checkmark and a CSS class -- stays available non-visually.
+
+Verified live through the actual UI (fixture provider): selected a criterion and confirmed
+`document.activeElement` was the Traceability inspector section, and read both badges' rendered HTML
+to confirm the glyphs are `aria-hidden` and the visible text is unchanged.

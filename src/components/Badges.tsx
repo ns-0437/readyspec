@@ -49,7 +49,7 @@ export function StatusBadge({ status }: { status: SessionStatus }) {
 export function ProviderBadge({ provider }: { provider: ProviderInfo }) {
   return provider.kind === "fixture" ? (
     <span className="badge k-assumed" title="Scripted output; no language model is involved">
-      ▲ Fixture provider
+      <span aria-hidden>▲ </span>Fixture provider
     </span>
   ) : (
     <span className="badge neutral">{provider.label}</span>

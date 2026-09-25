@@ -105,7 +105,11 @@ export function Workspace({ id }: { id: string }) {
 
       <ol className="stepper" aria-label="Progress">
         {STEPS.map((label, i) => (
-          <li key={label} className={i < step ? "done" : i === step ? "current" : ""} aria-current={i === step ? "step" : undefined}>{i < step ? "✓ " : ""}{label}</li>
+          <li key={label} className={i < step ? "done" : i === step ? "current" : ""} aria-current={i === step ? "step" : undefined}>
+            {i < step && <span aria-hidden>✓ </span>}
+            {label}
+            {i < step && <span className="sr-only"> (done)</span>}
+          </li>
         ))}
       </ol>
 

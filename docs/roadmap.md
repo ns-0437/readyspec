@@ -77,7 +77,11 @@ past a single data point.
 - ✅ Export a GitHub-issue-shaped Markdown variant — done: `exportGithubIssue()` in
   `src/server/workflow/export.ts` (`?format=issue`), task-list checkboxes for criteria/steps/tests,
   no evidence index (see decisions.md 17).
-- Accessibility pass (focus order in the inspector, screen-reader labels on badges).
+- ✅ Accessibility pass (focus order in the inspector, screen-reader labels on badges) — done:
+  selecting a criterion now moves focus to the Traceability inspector (it used to appear in a
+  separate column with no cue); the fixture-provider badge and completed-step checkmarks no
+  longer read their decorative glyphs aloud (decisions.md 19). Still open: a full pass over the
+  rest of the UI (dialogs, drag targets, color contrast) hasn't been done, just these two gaps.
 - Screenshots and a short recording in the README.
 
 ## 7. Engineering hygiene

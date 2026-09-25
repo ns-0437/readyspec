@@ -46,8 +46,13 @@ export function TraceInspector({ trace, evidence, activeEvidence, onSelectEviden
   onClear: () => void;
   criterionText: string;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    sectionRef.current?.focus();
+  }, [trace.criterionId]);
+
   return (
-    <section className="card sticky" aria-label="Traceability inspector" style={{ borderColor: "var(--accent)" }}>
+    <section ref={sectionRef} tabIndex={-1} className="card sticky" aria-label="Traceability inspector" style={{ borderColor: "var(--accent)" }}>
       <div className="card-head">
         <KindBadge kind="proposed" />
         <strong className="grow">Criterion {trace.criterionId}</strong>

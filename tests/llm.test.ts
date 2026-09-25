@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { AnthropicProvider } from "@/server/llm/anthropic";
 import { GeminiProvider } from "@/server/llm/gemini";
-import { GroqProvider } from "@/server/llm/groq";
+import { GroqProvider, groqSchemaName } from "@/server/llm/groq";
 import { Budget, costUsd, limitsFromEnv } from "@/server/llm/budget";
 import { createProvider } from "@/server/llm";
 import { computeRetryWaitMs, extractJson, generateStructured, StageError } from "@/server/llm/generate";
@@ -414,6 +414,30 @@ describe("GeminiProvider (mock HTTP server)", () => {
     const ctl = new AbortController();
     ctl.abort();
     await expect(provider().complete({ ...req(), signal: ctl.signal })).rejects.toBeInstanceOf(CancelledError);
+  });
+});
+
+describe("groqSchemaName", () => {
+  it("passes a name that already fits Groq's allowed character set through unchanged", () => {
+    expect(groqSchemaName("BriefContent")).toBe("BriefContent");
+    expect(groqSchemaName("a-b_c9")).toBe("a-b_c9");
+  });
+
+  it("replaces disallowed characters with underscores rather than dropping them", () => {
+    expect(groqSchemaName("The Result! Schema")).toBe("The_Result__Schema");
+    // All-disallowed input becomes underscores, not the empty-string fallback below -- it is a
+    // valid (if uninformative) name, so there is no reason to discard it.
+    expect(groqSchemaName("!!!")).toBe("___");
+  });
+
+  it("truncates to Groq's 64-character limit", () => {
+    const long = "x".repeat(100);
+    expect(groqSchemaName(long)).toHaveLength(64);
+    expect(groqSchemaName(long)).toBe("x".repeat(64));
+  });
+
+  it("falls back to a fixed name only for a truly empty schema name", () => {
+    expect(groqSchemaName("")).toBe("result");
   });
 });
 

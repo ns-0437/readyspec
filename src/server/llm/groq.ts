@@ -24,7 +24,7 @@ export interface GroqOptions {
 }
 
 /** Groq requires a schema `name` matching ^[a-zA-Z0-9_-]+$, up to 64 chars. */
-function groqSchemaName(schemaName: string): string {
+export function groqSchemaName(schemaName: string): string {
   const cleaned = schemaName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
   return cleaned || "result";
 }

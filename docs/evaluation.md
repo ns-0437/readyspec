@@ -16,7 +16,8 @@ to market.
 
 `evals/cases/*.json`: 30 tickets over four small fictional repositories written for this
 project (`fixtures/demo-repository` TypeScript, `fixtures/repos/shop-orders` TypeScript,
-`fixtures/repos/team-tasks` Python). Kinds: clear (2), ambiguous (14), conflicting documentation
+`fixtures/repos/team-tasks` Python, `fixtures/repos/helpdesk-platform` TypeScript — the one larger
+than the retrieval budget, decisions.md 15). Kinds: clear (2), ambiguous (14), conflicting documentation
 (5), irrelevant files (1), misleading premise (1), vague (1), insufficient evidence (2) — plus
 planted prompt-injection documents in every repository, some of which are retrieved.
 
@@ -65,6 +66,7 @@ alternatives). It is deliberately crude and auditable. The human rubric
 npm run eval -- --provider fixture --set dev        # no credentials; model-dependent metrics are n/a
 npm run eval -- --provider anthropic --set dev      # needs ANTHROPIC_API_KEY
 npm run eval -- --provider gemini --set dev         # needs GEMINI_API_KEY (or GOOGLE_API_KEY)
+npm run eval -- --provider groq --set dev           # needs GROQ_API_KEY (free tier, no card)
 npm run eval -- --provider anthropic --set heldout-v2  # once, after freezing the code (v1 is contaminated, see decisions.md 13)
 ```
 
@@ -79,7 +81,7 @@ scored as if it were model output.
 
 - Cases, fixtures, systems and scoring keywords were all written by the same person. Held-out
   cases guard against tuning, not against shared blind spots.
-- Twenty-six cases on three tiny repositories say little about real codebases, and nothing about scale.
+- Thirty cases on four small repositories say little about real codebases, and nothing about scale.
 - Keyword scoring both under- and over-credits paraphrase; report it as an approximation.
 - On the three original small repositories a single prompt sees everything, so retrieval cannot differentiate
   the systems there. A fourth, larger fixture (`helpdesk-platform`, ~30,800 characters) now exceeds the

@@ -25,13 +25,18 @@ tuning below, so no longer clean) and **held-out v2** (6, written before the tun
 | Set | Cases | Required-file recall | Precision (required + helpful) | Distractor files / case |
 |---|---|---|---|---|
 | Development (13 original) | 13 | 96% | 57% | 0.54 |
-| Development (17, incl. helpdesk-platform) | 17 | 97% | 52% | 0.71 |
+| Development (17, incl. helpdesk-platform, current code) | 17 | 97% | 52% | 0.59 |
 | — of which helpdesk-platform alone | 4 | 100% | 36% | 1.25 |
 | Held-out v1 (contaminated: rerun after tuning) | 7 | 100% | 59% | 0.57 |
 | **Held-out v2 (clean, run once)** | 6 | 100% | **48%** | 0.67 |
 
 Precision drops and distractors rise on the larger, more varied repository, as expected; recall stays perfect.
-Held-out sets were frozen before helpdesk-platform existed and are unaffected by it.
+Held-out sets were frozen before helpdesk-platform, test-pairing and the per-definer hop cap existed
+and are unaffected by any of them (decisions.md 15, 16, 18) — they are not rerun, by design (rerunning
+a held-out set after tuning is exactly what "contaminated" means for v1). The development row is
+current as of decisions.md 18: distractors/case fell from 0.71 to 0.59 (test-pairing and the hop cap,
+decisions.md 16 and 18) with recall and precision essentially unchanged; re-run any time with
+`npm run eval -- --provider fixture --set dev` since it needs no key.
 
 Per case, only one required file was missed across the original 26 cases (helpdesk-platform's 4 new cases all hit 100% recall): `src/api/routes.ts` for
 `demo-05-admin-skipped-log` ("Let admins see which notifications were skipped..."). The ticket shares
@@ -68,7 +73,7 @@ it exists.
 
 ## Other evidence that the system does what it claims (tests, not benchmark)
 
-These are engineering tests (156 in `tests/`), not model-quality evidence:
+These are engineering tests (193 in `tests/`), not model-quality evidence:
 
 - Snapshots exclude secrets, binaries, generated and oversized files, never follow symlinks or
   junctions, and pin content by hash. Traversal and out-of-root paths are rejected.
@@ -105,9 +110,12 @@ These are engineering tests (156 in `tests/`), not model-quality evidence:
 
 ## To complete this report
 
-1. Set `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` (optionally `READYSPEC_MODEL`, `READYSPEC_PRICE_IN_PER_MTOK`,
-   `READYSPEC_PRICE_OUT_PER_MTOK`).
-2. `npm run eval -- --provider anthropic --set dev` (or `--provider gemini`), repeat a few times to see variance.
+1. Set `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `GROQ_API_KEY` (free tier, no card; optionally
+   `READYSPEC_MODEL`, `READYSPEC_PRICE_IN_PER_MTOK`, `READYSPEC_PRICE_OUT_PER_MTOK`).
+2. `npm run eval -- --provider anthropic --set dev` (or `--provider gemini` / `--provider groq`),
+   repeat a few times to see variance. As of decisions.md 21, Groq's free tier on this account
+   caps at 8000 tokens/minute account-wide, which a single `analyze` call can already exceed — a
+   full eval run there may need a paid Dev Tier or a smaller prompt footprint per call.
 3. Freeze the code; run `--set heldout-v2` once (the only clean cohort left).
 4. Fill the generated `human-scoring-sheet-*.csv` using `evals/rubrics/human-rubric.md`, ideally
    blind and by someone other than the author.

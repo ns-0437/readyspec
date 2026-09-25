@@ -1,9 +1,11 @@
 /**
- * First-contact check for the live model path. Run once you have a key for either provider:
+ * First-contact check for the live model path. Run once you have a key for any provider:
  *   ANTHROPIC_API_KEY=... npm run smoke:live      (Anthropic)
  *   GEMINI_API_KEY=... npm run smoke:live         (Gemini; GOOGLE_API_KEY also works)
- * Set READYSPEC_PROVIDER=anthropic|gemini explicitly if both keys happen to be set and you want
- * a specific one; otherwise Anthropic is preferred when both are present (see src/server/llm/index.ts).
+ *   GROQ_API_KEY=... npm run smoke:live           (Groq; free tier, no card)
+ * Set READYSPEC_PROVIDER=anthropic|gemini|groq explicitly if more than one key happens to be set
+ * and you want a specific one; otherwise priority is anthropic > gemini > groq (see
+ * src/server/llm/index.ts).
  *
  * Step 1 makes one tiny structured call (auth, model id, forced/schema-constrained JSON output,
  * response shape). Step 2 runs the real staged pipeline (analyze, clarify, brief, verify) on the
@@ -19,8 +21,8 @@ import { loadCases } from "../evals/runners/cases";
 import { runStaged } from "../evals/runners/systems";
 
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
-    console.error("No model key set (ANTHROPIC_API_KEY or GEMINI_API_KEY/GOOGLE_API_KEY). This script only checks the live path; the fixture provider is not a model.");
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY && !process.env.GROQ_API_KEY) {
+    console.error("No model key set (ANTHROPIC_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY, or GROQ_API_KEY). This script only checks the live path; the fixture provider is not a model.");
     process.exit(2);
   }
   const provider = createProvider();

@@ -282,3 +282,11 @@ too tight for the app's current prompt sizes to complete a full staged session e
 `openai/gpt-oss-120b` as the default (better quality when it does fit) rather than downsizing shared
 stage token budgets to chase one tier's limit, which would cost every provider real output quality
 to work around a constraint specific to one free plan.
+
+## 22. live-smoke.ts didn't recognize a Groq-only key
+Item 21 added `GROQ_API_KEY` to `createProvider()`'s selection logic but missed `scripts/live-smoke.ts`'s
+own key-presence guard, which still only checked `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`/`GOOGLE_API_KEY`.
+This didn't surface during item 21's own testing only because a Gemini key happened to also be set
+in that environment -- with only a Groq key present, the script would print "No model key set" and
+exit before ever calling `createProvider()`, even though Groq was fully wired up and working. Fixed
+the guard and the file's docstring to include Groq.

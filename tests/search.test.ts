@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { verifyEvidenceRef, buildEvidence, evidenceId } from "@/server/repository/evidence";
-import { buildQuery, retrieveEvidence, stem, tokenize } from "@/server/repository/search";
+import { buildQuery, candidateTestPaths, retrieveEvidence, stem, tokenize } from "@/server/repository/search";
 import { createSnapshot } from "@/server/repository/snapshot";
 import { extractSymbols } from "@/server/repository/symbols";
-import type { SnapshotFile } from "@/server/repository/types";
+import type { Snapshot, SnapshotFile } from "@/server/repository/types";
 import { DEMO_REPO, DEMO_TICKET } from "./helpers";
 
 const file = (path: string, language: string, content: string): SnapshotFile => ({ path, language, content, size: content.length, sha256: "x" });
+
+let snapshotCounter = 0;
+const snapshotOf = (files: SnapshotFile[]): Snapshot => ({
+  // buildIndex() caches by id (search.ts), so distinct synthetic snapshots need distinct ids or
+  // they'd collide and one test's index would leak into another's.
+  id: `test-snapshot-${++snapshotCounter}`,
+  root: "/test",
+  commit: null,
+  files: new Map(files.map((f) => [f.path, f])),
+  excluded: [],
+  truncated: false,
+  capturedAt: new Date(0).toISOString(),
+});
 
 describe("tokenizing and query building", () => {
   it("splits camelCase, snake_case and paths", () => {
@@ -115,6 +128,77 @@ describe("boilerplate down-weighting", () => {
     const rank = (r: typeof on) => r.evidence.findIndex((e) => /readme/i.test(e.path));
     if (rank(on) >= 0 && rank(off) >= 0) expect(rank(off)).toBeGreaterThanOrEqual(rank(on));
     expect(new Set(off.evidence.map((e) => e.path))).toContain("src/notifications/dispatcher.ts");
+  });
+});
+
+describe("candidateTestPaths", () => {
+  it("derives the TS/JS and Python conventional test paths from a source file's basename", () => {
+    expect(candidateTestPaths("src/notifications/dispatcher.ts")).toEqual(["tests/dispatcher.test.ts", "tests/test_dispatcher.py"]);
+  });
+
+  it("works for a bare filename with no directory", () => {
+    expect(candidateTestPaths("dispatcher.ts")).toEqual(["tests/dispatcher.test.ts", "tests/test_dispatcher.py"]);
+  });
+
+  it("strips only the last extension, keeping dots inside the stem", () => {
+    expect(candidateTestPaths("src/a.b.c.ts")).toEqual(["tests/a.b.c.test.ts", "tests/test_a.b.c.py"]);
+  });
+
+  it("falls back to the whole filename when there is no extension", () => {
+    expect(candidateTestPaths("src/Makefile")).toEqual(["tests/Makefile.test.ts", "tests/test_Makefile.py"]);
+  });
+});
+
+describe("test-file pairing", () => {
+  // Six high-scoring padding files rank above the target file, so it lands outside picked.slice(0,
+  // 6) and is never treated as a "definer" by the ordinary symbol-aware second hop -- the only way
+  // its test file can be reached is the pairing pass, which (unlike that hop) looks at every picked
+  // source file, not just the top few. The test file shares no vocabulary with the ticket or with
+  // target.ts's identifier, so it can't be picked up lexically either.
+  const padding = Array.from({ length: 6 }, (_, i) => file(`src/padding${i}.ts`, "TypeScript", "widget ".repeat(60)));
+  const target = file("src/target.ts", "TypeScript", "// Handles a widget.\nexport function handleWidgetRequest(id: string): void {\n  return;\n}\n");
+  const targetTest = file("tests/target.test.ts", "TypeScript", "// Regression coverage for a change made earlier this cycle.\nimport thing from \"../src/target\";\nthing();\n");
+  const snap = snapshotOf([...padding, target, targetTest]);
+
+  it("pairs a retrieved source file with its own test file even when it's not a top-6 definer", () => {
+    const result = retrieveEvidence(snap, "widget", { minItems: 7, relativeCutoff: 0.99 });
+    expect(result.evidence.map((e) => e.path)).toContain("src/target.ts");
+    const paired = result.evidence.find((e) => e.path === "tests/target.test.ts");
+    expect(paired).toBeDefined();
+    expect(paired!.retrievalReason).toBe("tests src/target.ts, which was retrieved");
+  });
+
+  it("stops pairing test files when maxTestPairs is 0", () => {
+    const result = retrieveEvidence(snap, "widget", { minItems: 7, relativeCutoff: 0.99, maxTestPairs: 0 });
+    expect(result.evidence.some((e) => e.path === "tests/target.test.ts")).toBe(false);
+  });
+});
+
+describe("per-definer cap on the symbol-aware second hop", () => {
+  const definer = file(
+    "src/core.ts",
+    "TypeScript",
+    ["export function processWidget(widgetId: string): void {", "  // widget widget widget widget widget widget widget widget", "  const widget = widgetId;", "  void widget;", "}"].join("\n"),
+  );
+  const callers = Array.from({ length: 6 }, (_, i) =>
+    file(`src/callers/caller${i}.ts`, "TypeScript", `import { processWidget } from "../core";\nprocessWidget("caller-${i}");\n`),
+  );
+  const snap = snapshotOf([definer, ...callers]);
+  const ticket = "How does the system process a widget?";
+
+  // relativeCutoff/minItems pinned tight so only the (heavily widget-repeating) definer clears the
+  // initial lexical pass; every caller is reachable only through the second hop below.
+  const hopReasonsFor = (maxHopsPerDefiner: number, maxReferenceHops: number) =>
+    retrieveEvidence(snap, ticket, { relativeCutoff: 0.99, minItems: 1, maxTestPairs: 0, maxHopsPerDefiner, maxReferenceHops }).evidence.filter((e) =>
+      e.retrievalReason.startsWith("references processWidget"),
+    );
+
+  it("caps hops contributed by a single definer even when the shared budget has room", () => {
+    expect(hopReasonsFor(2, 100)).toHaveLength(2);
+  });
+
+  it("lets a single definer fill the shared budget when its own cap is generous", () => {
+    expect(hopReasonsFor(10, 10)).toHaveLength(6);
   });
 });
 

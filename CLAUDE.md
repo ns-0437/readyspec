@@ -7,7 +7,7 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
-Milestones 1-5 built and checked: lint, typecheck, 171 tests, production build, and the UI driven
+Milestones 1-5 built and checked: lint, typecheck, 179 tests, production build, and the UI driven
 end to end in a browser. **Gemini (`gemini-3.6-flash`) is validated live** as of 2026-09-22: full
 staged pipeline completed via `npm run smoke:live` and separately through the real browser UI;
 three real schema-compatibility bugs were found from live 400s and fixed (docs/decisions.md 14) —

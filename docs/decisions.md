@@ -210,3 +210,27 @@ than left at the old numbers.
 Verified live through the actual UI (fixture provider): selected a criterion and confirmed
 `document.activeElement` was the Traceability inspector section, and read both badges' rendered HTML
 to confirm the glyphs are `aria-hidden` and the visible text is unchanged.
+
+## 20. Unit tests for test-pairing and the per-definer hop cap
+Both features (16, 18) had shipped with only integration-level confirmation (the regression eval's
+aggregate numbers, one live browser check) and no dedicated unit tests -- a real coverage gap for
+logic that already handles two-digit-percentage swings in dev precision. Added `tests/search.test.ts`
+coverage: `candidateTestPaths` directly (basename/extension/no-extension edge cases); test-pairing
+against a small synthetic snapshot built so the paired source file ranks outside the top-6 "definer"
+slice (proving the pairing pass reaches files the ordinary second hop can't, and that `maxTestPairs: 0`
+disables it); and the per-definer hop cap against a synthetic definer with 6 referencing callers,
+proving `maxHopsPerDefiner` binds independently of `maxReferenceHops` in both directions.
+
+Writing the test-pairing case first against `DEMO_REPO`/`DEMO_TICKET` (like the rest of the file)
+failed for a genuinely useful reason: every test file in that fixture already gets retrieved through
+ordinary lexical or reference-hop matches before the pairing pass runs, so pairing never fires there
+at all -- the repo is too small and dense to isolate the feature's own contribution. Needed a
+purpose-built synthetic `Snapshot` instead (a `snapshotOf()` helper next to the existing `file()` one).
+
+Building that helper surfaced a real bug in the test infrastructure itself: `buildIndex()`
+(`search.ts`) caches its result by `snapshot.id`, and the first version of `snapshotOf()` hardcoded
+`id: "test-snapshot"` for every call. Two synthetic snapshots with different content but the same
+hardcoded id collided in that cache, so the second describe block's `retrieveEvidence()` silently
+returned results built from the first block's files. Fixed by giving each synthetic snapshot a
+unique id (an incrementing counter) -- worth calling out since it would have produced confusing,
+order-dependent test failures for the next person who copies this pattern without knowing why.

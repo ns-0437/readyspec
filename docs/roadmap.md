@@ -82,7 +82,6 @@ past a single data point.
   separate column with no cue); the fixture-provider badge and completed-step checkmarks no
   longer read their decorative glyphs aloud (decisions.md 19). Still open: a full pass over the
   rest of the UI (dialogs, drag targets, color contrast) hasn't been done, just these two gaps.
-- Screenshots and a short recording in the README.
 
 ## 7. Engineering hygiene
 

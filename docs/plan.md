@@ -9,7 +9,7 @@
 4. **Verification + evals** — done. Citation/support/coverage checks, approval gate, 179 tests, 30-case benchmark
    (17 dev, 7 held-out v1 contaminated, 6 held-out v2 clean), runner for three systems. Only deterministic
    results exist (evals/REPORT.md).
-5. **Finish** — README, report, demo script done. Remaining: a live-model run, human scoring, an actual recording.
+5. **Finish** — README, report, demo script done. Remaining: a live-model run, human scoring.
 
 Next: get an API key (Anthropic or Gemini), run `npm run eval -- --provider anthropic --set dev` (or
 `--provider gemini`), fix the biggest weakness it exposes, run `--set heldout-v2` once, then update evals/REPORT.md.

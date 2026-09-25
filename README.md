@@ -28,7 +28,7 @@ about existing behavior points at code; every proposed change connects to a requ
 | **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | **No model-quality benchmark result exists yet.** The harness, 30 cases (four fixture repositories, one now larger than the retrieval budget) and human rubric are ready; `npm run eval` against a real provider has not been run (needs dozens of calls) |
 | Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
 | 179 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
-| Deterministic retrieval and static-checklist benchmark results | No screenshots or recording yet |
+| Deterministic retrieval and static-checklist benchmark results | Model-quality result needs a working live provider (see below) |
 
 Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
 mechanical elsewhere. It is labelled in the UI, in the brief, in exports and in evaluation reports.
@@ -211,7 +211,7 @@ A separate workflow checks for retrieval regressions weekly and on PRs that touc
 1. Validate the live path and finish the benchmark ([docs/live-validation.md](docs/live-validation.md)).
 2. Fix what that exposes; improve retrieval precision and the vocabulary gap.
 3. A benchmark on repositories larger than the context budget.
-4. Polish: revision diffs, inline line highlighting, screenshots and a recording.
+4. Polish: revision diffs, inline line highlighting.
 
 Details and reasoning: [docs/roadmap.md](docs/roadmap.md). Decisions and measured trade-offs:
 [docs/decisions.md](docs/decisions.md).

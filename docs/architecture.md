@@ -114,9 +114,10 @@ providers see only the rendered prompt.
 
 ## Provider layer
 
-`LlmProvider.complete(request) -> { text, usage }`. Three implementations, selected by
-`createProvider()` (`src/server/llm/index.ts`) from env vars; a session pins whichever one was
-selected at creation (`service.ts` refuses to continue a job if the provider changes underneath it):
+`LlmProvider.complete(request) -> { text, usage }`. Four implementations, selected by
+`createProvider()` (`src/server/llm/index.ts`) from env vars (priority anthropic > gemini > groq >
+fixture, or explicit `READYSPEC_PROVIDER`); a session pins whichever one was selected at creation
+(`service.ts` refuses to continue a job if the provider changes underneath it):
 
 - `AnthropicProvider` — `fetch` against the Messages API; forces a single tool call whose input
   schema is the stage's JSON Schema (`tool_choice: {type: "tool", ...}`).
@@ -125,12 +126,22 @@ selected at creation (`service.ts` refuses to continue a job if the provider cha
   output has no separate "forced tool" step). The schema is passed through `toGeminiSchema`, which
   drops JSON Schema keywords (`$schema`, `additionalProperties`, `$ref`, ...) that Gemini's
   restricted OpenAPI-subset schema does not accept.
+- `GroqProvider` — `fetch` against the OpenAI-compatible `/chat/completions`; requests JSON via
+  `response_format: {type: "json_schema", strict: false}`. Unlike Gemini, no schema translation was
+  needed live (it accepts standard JSON Schema); `strict: false` is deliberate, not a shortcut --
+  Groq's `strict: true` constrained decoding requires every field `required` and every object
+  `additionalProperties: false`, which fights this app's genuinely-optional schema fields the same
+  way Gemini's schema needed active stripping (docs/decisions.md 21).
 - `FixtureProvider` — scripted for the demonstration ticket and mechanical otherwise; it is
   labelled in the UI, the brief (`producedBy`), exports and evaluation reports.
 
-Both real adapters share the same shape of error handling: the API key goes in a header (never the
-URL or logs), 429/5xx are retryable, other 4xx are not, a malformed or contentless response is a
-`ProviderError`, and a caller-aborted `AbortSignal` becomes `CancelledError`. Neither has been
-exercised against its real API (see README status); both are covered by tests against a local mock
-HTTP server (`tests/llm.test.ts`) that check request shape, response parsing, error classification
-and that the API key is never echoed back in a surfaced error message.
+All three real adapters share the same shape of error handling: the API key goes in a header (never
+the URL or logs), 429/5xx are retryable, other 4xx are not, a malformed or contentless response is a
+`ProviderError`, and a caller-aborted `AbortSignal` becomes `CancelledError`. A 429's `Retry-After`
+header, when present, is parsed into `ProviderError.retryAfterMs` and honoured by the retry backoff
+in `generate.ts` (added after Groq's free-tier throughput limit exposed that the old fixed
+exponential backoff undershot a real `Retry-After` value by ~20x -- docs/decisions.md 21). Gemini and
+Groq have each been exercised against their real API at least once (see README status for what that
+did and didn't prove); Anthropic has not (no key). All three are covered by tests against a local
+mock HTTP server (`tests/llm.test.ts`) that check request shape, response parsing, error
+classification and that the API key is never echoed back in a surfaced error message.

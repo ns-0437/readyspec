@@ -25,8 +25,9 @@ export function parseEvalArgs(args: string[]) {
     if (seen.has(token.name)) throw new Error(`Duplicate option --${token.name}`);
     seen.add(token.name);
   }
+  const optionValues: Record<string, string | boolean | undefined> = values;
   const get = (name: string): string | undefined => {
-    const raw = values[name];
+    const raw = optionValues[name];
     if (typeof raw !== "string") return undefined;
     if (!raw.trim() || raw.startsWith("--")) throw new Error(`--${name} requires a value`);
     return raw.trim();

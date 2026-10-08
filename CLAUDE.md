@@ -8,6 +8,9 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 ## Status (update every milestone)
 
 **Static demo foundation (2026-10-08):** `demo/` is a separate, browser-only TypeScript frontend.
+The evidence explorer filters/selects excerpts and exposes their line numbers and hashes. Three
+predefined product decisions drive proposed criteria and blocked dependencies in `demo/src/model.ts`;
+the app labels this deterministic template as scripted, never as model output.
 `npm run demo:build` compiles it to ignored `dist-demo/`, copying only named public assets and four
 allowlisted fixture excerpts with line ranges, hashes, and commit-pinned links. It never bundles the
 server, reads environment files, or calls providers. `npm run demo:serve` previews at

@@ -203,7 +203,12 @@ export function scoreChunks(index: SearchIndex, query: QueryTerm[]): Scored[] {
       reason: `lexical match on ${matched.slice(0, 6).join(", ")}${chunk.symbol ? `; in ${chunk.symbol.kind} ${chunk.symbol.name}` : ""}`,
     });
   }
-  return out.sort((a, b) => b.score - a.score || (a.chunk.path < b.chunk.path ? -1 : 1) || a.chunk.startLine - b.chunk.startLine);
+  return out.sort((a, b) => {
+    const scoreOrder = b.score - a.score;
+    if (scoreOrder !== 0) return scoreOrder;
+    if (a.chunk.path !== b.chunk.path) return a.chunk.path < b.chunk.path ? -1 : 1;
+    return a.chunk.startLine - b.chunk.startLine;
+  });
 }
 
 /* -------------------------------- retrieval -------------------------------- */

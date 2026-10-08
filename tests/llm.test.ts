@@ -1,6 +1,6 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AnthropicProvider } from "@/server/llm/anthropic";
 import { GeminiProvider } from "@/server/llm/gemini";
@@ -37,6 +37,49 @@ const run = (provider: LlmProvider, extra: Partial<Parameters<typeof generateStr
   generateStructured({ provider, budget: new Budget(TEST_LIMITS, zeroUsage), stage: "analyze", system: "s", user: "u", schema: Schema, schemaName: "T", maxOutputTokens: 100, backoffMs: 0, ...extra });
 
 describe("generateStructured", () => {
+  it("cancels immediately when the retry event aborts before backoff starts", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const provider = scripted([new ProviderError("retry", { retryable: true }), ok({ n: 1 })]);
+      await expect(run(provider, {
+        signal: controller.signal, backoffMs: 90_000, onEvent: () => controller.abort(),
+      })).rejects.toThrow(CancelledError);
+      expect(provider.calls).toHaveLength(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("cleans up the abort listener when backoff completes normally", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const remove = vi.spyOn(controller.signal, "removeEventListener");
+      const provider = scripted([new ProviderError("retry", { retryable: true }), ok({ n: 1 })]);
+      const result = run(provider, { signal: controller.signal, backoffMs: 100 });
+      await vi.advanceTimersByTimeAsync(100);
+      expect((await result).n).toBe(1);
+      expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+      expect(vi.getTimerCount()).toBe(0);
+      remove.mockRestore();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("cancels an active backoff without dispatching another attempt", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const provider = scripted([new ProviderError("retry", { retryable: true }), ok({ n: 1 })]);
+      const result = run(provider, { signal: controller.signal, backoffMs: 90_000 });
+      const rejection = expect(result).rejects.toThrow(CancelledError);
+      await vi.advanceTimersByTimeAsync(0);
+      controller.abort();
+      await rejection;
+      expect(provider.calls).toHaveLength(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
   it("returns validated data and reports usage", async () => {
     const seen: number[] = [];
     const out = await run(scripted([ok({ n: 1 })]), { onUsage: (u) => seen.push(u.inputTokens) });

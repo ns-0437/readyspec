@@ -68,6 +68,10 @@ not. A single-case run is a feasibility check, not a benchmark. No live call mad
 
 ## Purpose, user, scope
 
+**Retry cancellation (2026-10-08):** backoff rejects an already-aborted signal and removes its abort
+listener both on timeout and cancellation. Tests cover aborts immediately before and during the wait;
+neither dispatches another request.
+
 **Clarification identity (2026-10-08):** questions deduplicate within a round as well as against
 history; normalization preserves Unicode letters/numbers. IDs cannot collide with previous questions,
 recorded decisions, or earlier questions in the same model response. Regression tests: `tests/clarify.test.ts`.

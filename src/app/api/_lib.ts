@@ -21,8 +21,31 @@ export function toResponse(e: unknown): NextResponse {
 }
 
 export async function readBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
-  const text = await req.text();
-  if (text.length > 400_000) throw new RuleViolationError("Request body too large");
+  const contentLength = Number(req.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > 400_000) {
+    throw new RuleViolationError("Request body too large");
+  }
+  const reader = req.body?.getReader();
+  if (!reader) return schema.parse({});
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > 400_000) {
+      await reader.cancel().catch(() => undefined);
+      throw new RuleViolationError("Request body too large");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const text = new TextDecoder().decode(bytes);
   return schema.parse(text ? JSON.parse(text) : {});
 }
 

@@ -4,6 +4,16 @@ Results and analysis: [evals/REPORT.md](../evals/REPORT.md). This page is the me
 
 ## Question
 
+CLI options are validated before a run. Unknown systems, misspelled or duplicate flags, invalid
+repetition counts, and case IDs outside the selected set are errors. `--pilot` fixes the five
+development cases, single/staged systems, and one repetition; do not combine it with `--cases`,
+`--systems`, `--set`, or a different repetition count. Use a non-pilot command for custom selection.
+
+For CI-style key-free mechanics, run `npm run eval -- --provider fixture --set dev --systems checklist,staged`.
+For a same-evidence pilot plan, run `npm run eval -- --provider fixture --pilot --profile compact --dry-run`.
+The production-default single/brief output allowances differ: comparing both requires an explicit
+equal-allowance profile such as `compact`, or matching `--output-allowance` overrides.
+
 Does a staged, repository-aware workflow give an engineer a better starting point than (a) a
 static checklist or (b) one model prompt given the same repository and a comparable context
 budget? "Better" means: finds the needed code, makes claims the code supports, surfaces the

@@ -90,6 +90,7 @@ export class Store {
          VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(id, input.title, input.repoPath, input.repoLabel, input.ticket, JSON.stringify(input.provider), "created", 1, input.isDemo ? 1 : 0, ts, ts);
+    this.db.prepare("INSERT OR IGNORE INTO usage_accounting (session_id, failures_tracked) VALUES (?, 1)").run(id);
     return this.getSession(id)!;
   }
 
@@ -124,7 +125,7 @@ export class Store {
   }
 
   deleteSession(id: string): void {
-    for (const table of ["artifacts", "decisions", "activity", "usage", "usage_failures"]) {
+    for (const table of ["artifacts", "decisions", "activity", "usage", "usage_failures", "usage_accounting"]) {
       this.db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(id);
     }
     this.db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
@@ -261,29 +262,43 @@ export class Store {
       .run(sessionId, now(), stage, u.inputTokens, u.outputTokens, u.costUsd, u.estimated ? 1 : 0);
   }
 
-  /** A dispatched request with no usable response. Persisted so a resumed session cannot start with a fresh budget. */
-  recordFailedAttempt(sessionId: string, stage: string, f: { charge: "none" | "uncertain"; reservedInputTokens: number; reservedOutputTokens: number; reservedCostUsd: number | null }): void {
+  /**
+   * A dispatched request with no usable response. Persisted so a resumed session cannot start with a
+   * fresh budget. Only the estimated TOKEN reservation is stored, never a dollar figure: dollars are
+   * derived from whatever prices are configured when the budget is rebuilt, so an attempt that failed
+   * while unpriced is not treated as free once a dollar ceiling is enabled. It is an estimate, not
+   * actual usage.
+   */
+  recordFailedAttempt(sessionId: string, stage: string, f: { reservedInputTokens: number; reservedOutputTokens: number }): void {
     this.db
-      .prepare("INSERT INTO usage_failures (session_id,at,stage,charge,reserved_input,reserved_output,reserved_cost_usd) VALUES (?,?,?,?,?,?,?)")
-      .run(sessionId, now(), stage, f.charge, f.reservedInputTokens, f.reservedOutputTokens, f.reservedCostUsd);
+      .prepare("INSERT INTO usage_failures (session_id,at,stage,charge,reserved_input,reserved_output,reserved_cost_usd) VALUES (?,?,?,?,?,?,NULL)")
+      .run(sessionId, now(), stage, "uncertain", f.reservedInputTokens, f.reservedOutputTokens);
   }
 
   getUsage(sessionId: string): Usage {
     const row = this.db
       .prepare(
         `SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS i, COALESCE(SUM(output_tokens),0) AS o,
-                SUM(cost_usd) AS c, COALESCE(MAX(estimated),0) AS e FROM usage WHERE session_id = ?`,
+                SUM(cost_usd) AS c, COALESCE(MAX(estimated),0) AS e,
+                COALESCE(SUM(CASE WHEN cost_usd IS NULL THEN input_tokens ELSE 0 END),0) AS ui,
+                COALESCE(SUM(CASE WHEN cost_usd IS NULL THEN output_tokens ELSE 0 END),0) AS uo
+         FROM usage WHERE session_id = ?`,
       )
-      .get(sessionId) as { calls: number; i: number; o: number; c: number | null; e: number };
+      .get(sessionId) as { calls: number; i: number; o: number; c: number | null; e: number; ui: number; uo: number };
     const f = this.db
       .prepare(
-        `SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN charge = 'uncertain' THEN 1 ELSE 0 END),0) AS u, COALESCE(SUM(reserved_input),0) AS i,
-                COALESCE(SUM(reserved_output),0) AS o, SUM(reserved_cost_usd) AS c FROM usage_failures WHERE session_id = ?`,
+        `SELECT COUNT(*) AS n, COALESCE(SUM(reserved_input),0) AS i, COALESCE(SUM(reserved_output),0) AS o,
+                COALESCE(SUM(CASE WHEN charge = 'none' THEN 1 ELSE 0 END),0) AS legacy FROM usage_failures WHERE session_id = ?`,
       )
-      .get(sessionId) as { n: number; u: number; i: number; o: number; c: number | null };
+      .get(sessionId) as { n: number; i: number; o: number; legacy: number };
+    const marker = this.db.prepare("SELECT failures_tracked AS t FROM usage_accounting WHERE session_id = ?").get(sessionId) as { t: number } | undefined;
     return Usage.parse({
       calls: row.calls, inputTokens: row.i, outputTokens: row.o, costUsd: row.c, estimated: row.e === 1,
-      failedAttempts: f.n, uncertainAttempts: f.u, uncertainInputTokens: f.i, uncertainOutputTokens: f.o, uncertainCostUsd: f.c,
+      unpricedInputTokens: row.ui, unpricedOutputTokens: row.uo,
+      failedAttempts: f.n, uncertainInputTokens: f.i, uncertainOutputTokens: f.o,
+      // False for sessions created before failed attempts were tracked, and for rows written under the
+      // older "4xx is charge-free" rule (zero reservation recorded): their true exposure is unknown.
+      failuresTracked: (marker === undefined || marker.t === 1) && f.legacy === 0,
     });
   }
 }

@@ -47,8 +47,10 @@ parallelism; not run live.
 **Budget accounting (2026-10-08):** every dispatched request attempt (retries and provider failures
 included) is reserved and prechecked before `provider.complete()`; a dollar ceiling now needs explicit
 non-negative prices (0 allowed) or is rejected, and checks estimated worst-case cost per request.
-Failed attempts persist in `usage_failures`, keep a conservative "uncertain" reservation unless the API
-rejected them (4xx), and are never invented as actual usage. Estimates are heuristic (chars/4), so the
+Failed attempts persist in `usage_failures` as token reservations and are never invented as actual
+usage; no HTTP status is assumed charge-free (4xx included). Dollars are rebuilt from tokens with the
+current prices, so enabling a ceiling later does not treat unpriced history as free; sessions that
+predate tracking are refused a dollar ceiling (`usage_accounting`). Estimates are heuristic (chars/4), so the
 ceiling is not an exact billing guarantee. Not run against live providers.
 
 ## Purpose, user, scope

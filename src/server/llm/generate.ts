@@ -24,15 +24,6 @@ export interface GenerateOptions<T> {
   onFailedAttempt?: (f: FailedAttempt) => void;
 }
 
-/**
- * An HTTP 4xx (other than 408 timeout) means the API rejected the request before generating, so no
- * usage was incurred. Anything else (5xx, network error, timeout, cancellation mid-flight) may have
- * been billed and stays reserved as uncertain.
- */
-export function isChargeFree(e: unknown): boolean {
-  return e instanceof ProviderError && e.status !== null && e.status >= 400 && e.status < 500 && e.status !== 408;
-}
-
 export class StageError extends Error {
   readonly recoverable: boolean;
   constructor(message: string, recoverable: boolean) {
@@ -118,7 +109,7 @@ export async function generateStructured<T>(opts: GenerateOptions<T>): Promise<T
           context: opts.context,
         });
       } catch (e) {
-        opts.onFailedAttempt?.(opts.budget.fail(reservation, isChargeFree(e)));
+        opts.onFailedAttempt?.(opts.budget.fail(reservation));
         throw e;
       }
       // Reported usage replaces the reservation, even if the content below fails validation.

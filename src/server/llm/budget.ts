@@ -66,14 +66,14 @@ export interface Reservation {
   estCostUsd: number | null;
 }
 
-/** Record of a dispatched request that produced no usable response, for persistence across resume. */
+/**
+ * A dispatched request that produced no usable response, for persistence across resume. Only the
+ * token reservation is recorded: it is an ESTIMATE of possible exposure (estimated input + maximum
+ * output), not actual usage. Dollars are derived from the prices configured when a budget is rebuilt.
+ */
 export interface FailedAttempt {
-  /** "none": the API rejected it before generating (4xx, so no charge). "uncertain": it may have been billed. */
-  charge: "none" | "uncertain";
-  /** What stays reserved against the ceilings for this attempt (zero when charge is "none"). */
   reservedInputTokens: number;
   reservedOutputTokens: number;
-  reservedCostUsd: number | null;
 }
 
 const EPS = 1e-9;
@@ -87,9 +87,12 @@ const EPS = 1e-9;
  * is a best-effort guard, not an exact billing guarantee: real tokenization and provider billing
  * can differ from the estimate.
  *
- * Failures without usage metadata are never turned into invented actual usage. Unless the API
- * rejected the request outright (4xx), the attempt keeps a conservative reservation (estimated
- * input, maximum output) as "uncertain" usage, tracked and persisted separately from reported usage.
+ * Actual usage is what a provider REPORTED. A dispatched request that returns no usage (HTTP error of
+ * any status, network failure, timeout, cancellation) is unknown: it may or may not have been billed,
+ * and error statuses are not treated as proof of "no charge". Such an attempt stays counted and keeps
+ * a conservative reservation (estimated input, maximum output) tracked and persisted separately from
+ * reported usage, and is never recorded as actual usage. Only a precheck rejected locally, before
+ * any request was sent, costs nothing. The call ceiling bounds how many attempts can accumulate.
  */
 export class Budget {
   private attempts: number;
@@ -110,10 +113,24 @@ export class Budget {
         "A dollar ceiling (READYSPEC_MAX_COST_USD) needs READYSPEC_PRICE_IN_PER_MTOK and READYSPEC_PRICE_OUT_PER_MTOK, both set explicitly to finite non-negative numbers (0 is allowed when explicit). Set them or remove the ceiling.",
       );
     }
+    if (limits.maxCostUsd !== null && prior.failuresTracked === false) {
+      throw new BudgetConfigError(
+        "This session has failed model requests that were never recorded (it predates failed-attempt tracking), so its earlier possible spend cannot be reconstructed and a dollar ceiling cannot be enforced for it. Start a new session or remove READYSPEC_MAX_COST_USD.",
+      );
+    }
+    const uncertainIn = prior.uncertainInputTokens ?? 0;
+    const uncertainOut = prior.uncertainOutputTokens ?? 0;
     this.attempts = prior.calls + (prior.failedAttempts ?? 0);
-    this.input = prior.inputTokens + (prior.uncertainInputTokens ?? 0);
-    this.output = prior.outputTokens + (prior.uncertainOutputTokens ?? 0);
-    this.cost = (prior.costUsd ?? 0) + (prior.uncertainCostUsd ?? 0);
+    this.input = prior.inputTokens + uncertainIn;
+    this.output = prior.outputTokens + uncertainOut;
+    // Dollars are rebuilt from tokens with the CURRENT prices, so nothing recorded while unpriced counts as free:
+    //   known reported cost (rows priced when recorded; disjoint from the next term)
+    // + reported tokens whose cost was unknown when recorded, priced now (actual tokens, estimated price)
+    // + the estimated exposure of failed attempts, priced now (an estimate, never an actual charge).
+    this.cost =
+      (prior.costUsd ?? 0) +
+      (costUsd(prior.unpricedInputTokens ?? 0, prior.unpricedOutputTokens ?? 0, prices) ?? 0) +
+      (costUsd(uncertainIn, uncertainOut, prices) ?? 0);
   }
 
   /** Throws BudgetExceededError (nothing counted) if this request could breach a ceiling; otherwise counts the attempt. */
@@ -155,13 +172,12 @@ export class Budget {
     return c;
   }
 
-  /** The request was dispatched but gave no usable response. The attempt stays counted; see class doc for the reservation. */
-  fail(r: Reservation, chargeFree: boolean): FailedAttempt {
+  /** The request was dispatched but gave no usable response: usage unknown. The attempt stays counted and keeps its estimated reservation (see class doc). */
+  fail(r: Reservation): FailedAttempt {
     this.release(r);
-    if (chargeFree) return { charge: "none", reservedInputTokens: 0, reservedOutputTokens: 0, reservedCostUsd: 0 };
     this.input += r.estInputTokens;
     this.output += r.maxOutputTokens;
     this.cost += r.estCostUsd ?? 0;
-    return { charge: "uncertain", reservedInputTokens: r.estInputTokens, reservedOutputTokens: r.maxOutputTokens, reservedCostUsd: r.estCostUsd };
+    return { reservedInputTokens: r.estInputTokens, reservedOutputTokens: r.maxOutputTokens };
   }
 }

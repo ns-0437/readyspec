@@ -4,6 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Explore ReadySpec: turn a rough ticket into an evidence-backed brief. An interactive, scripted demo with real fixture code, human decisions, and traceable criteria.">
   <meta name="theme-color" content="#153d35">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>ReadySpec — A little clarity before the code.</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css">
   <script type="module" src="./assets/app.js"></script>
@@ -16,7 +17,7 @@
     <section id="workspace" class="workspace" aria-labelledby="workspace-title"><header class="workspace-header"><div><p class="eyebrow">YOUR WORKSPACE</p><h2 id="workspace-title">From request to ready.</h2></div><div class="repo-label"><span aria-hidden="true">◇</span><div>notification-service<small>Fictional TypeScript repository</small></div><span class="tag">read-only</span></div></header>
       <div class="disclosure"><span class="disclosure-dot" aria-hidden="true"></span><p><strong>Scripted, browser-only demo.</strong> Explore bundled public fixture code and predefined decisions. No repository upload, model call, or server session. This is a product walkthrough, not evidence of model quality.</p></div>
       <nav class="steps" aria-label="Demo stages"><a class="step active" href="#evidence-panel" aria-current="step"><span>01</span><div>Find the evidence<small>See what exists today</small></div><b aria-hidden="true">↗</b></a><a class="step" href="https://github.com/ns-0437/readyspec#try-locally"><span>02</span><div>Resolve the ambiguity<small>Full flow available locally</small></div></a><a class="step" href="https://github.com/ns-0437/readyspec#try-locally"><span>03</span><div>Review the brief<small>Full flow available locally</small></div></a></nav>
-      <div id="app" aria-live="polite"><p class="loading">Loading public fixture excerpts…</p></div>
+      <div id="app"><p class="loading" role="status">Loading public fixture excerpts…</p></div>
       <noscript><p class="empty">Enable JavaScript for the interactive demo, or <a href="https://github.com/ns-0437/readyspec#try-locally">run the full application locally</a>.</p></noscript>
     </section>
     <section class="principles" aria-label="Design principles"><article><span>01 / TRACEABLE</span><h3>Show your working.</h3><p>Code excerpts carry file paths, line ranges, and hashes. Follow an observation back to its source.</p></article><article><span>02 / HUMAN-LED</span><h3>Leave decisions to people.</h3><p>A missing requirement is a question to ask, not permission to invent a product policy.</p></article><article><span>03 / HONEST BY DESIGN</span><h3>A citation is not a proof.</h3><p>Structural checks cannot establish behavioral correctness. Review the reasoning before implementation.</p></article></section>

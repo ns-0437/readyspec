@@ -7,6 +7,11 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
+**Pages deployment (2026-10-08):** `.github/workflows/pages.yml` tests the demo, builds and verifies
+the exact `dist-demo` artifact, and publishes via the `github-pages` environment on relevant main
+pushes or manual dispatch. PR CI also runs `demo:build` and `demo:check`. Planned public URL:
+`https://ns-0437.github.io/readyspec/`. Operational notes and boundaries: `docs/pages-demo.md`.
+
 **Static demo foundation (2026-10-08):** `demo/` is a separate, browser-only TypeScript frontend.
 `demo/src/draft.ts` implements editable criteria, review acknowledgement, labelled Markdown/JSON/issue
 exports, and validated local drafts. Changing decisions clears edits/approval; editing clears approval.

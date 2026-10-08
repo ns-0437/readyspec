@@ -9,8 +9,8 @@ export class BudgetConfigError extends Error {
   }
 }
 
-function envNumber(name: string, fallback: number): number {
-  const v = Number(process.env[name]);
+function envNumber(env: Record<string, string | undefined>, name: string, fallback: number): number {
+  const v = Number(env[name]);
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
@@ -24,9 +24,9 @@ export function limitsFromEnv(env: Record<string, string | undefined> = process.
     maxCostUsd = n;
   }
   return {
-    maxCalls: envNumber("READYSPEC_MAX_CALLS", 14),
-    maxInputTokens: envNumber("READYSPEC_MAX_INPUT_TOKENS", 200_000),
-    maxOutputTokens: envNumber("READYSPEC_MAX_OUTPUT_TOKENS", 60_000),
+    maxCalls: envNumber(env, "READYSPEC_MAX_CALLS", 14),
+    maxInputTokens: envNumber(env, "READYSPEC_MAX_INPUT_TOKENS", 200_000),
+    maxOutputTokens: envNumber(env, "READYSPEC_MAX_OUTPUT_TOKENS", 60_000),
     maxCostUsd,
   };
 }

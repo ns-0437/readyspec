@@ -11,6 +11,7 @@
     "build": "next build",
     "demo:build": "tsx scripts/build-demo.ts",
     "demo:serve": "tsx scripts/serve-demo.ts",
+    "demo:check": "tsx scripts/check-demo.ts",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit && tsc -p fixtures/tsconfig.json --noEmit",

@@ -9,13 +9,18 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Node](https://img.shields.io/badge/Node-%E2%89%A522.13-339933)
 
-[Try locally](#try-locally) · [Explore an example](#from-ticket-to-brief) · [Under the hood](#under-the-hood) · [What-is-measured](#what-is-measured)
+[**Launch interactive demo ↗**](https://ns-0437.github.io/readyspec/) · [Try locally](#try-locally) · [Under the hood](#under-the-hood) · [What is measured](#what-is-measured)
 
 </div>
 
 ReadySpec reads a repository, finds the decisions a ticket leaves open, asks focused questions,
 and builds a brief with code citations. Select an acceptance criterion in the app to trace it
 to evidence, components, tests, and the decisions behind it.
+
+**[Try the hosted demo](https://ns-0437.github.io/readyspec/)** — explore fixture code, make three
+product decisions, edit the resulting criteria, and export a reviewed brief. No account or API key.
+The Pages demo is scripted and runs entirely in your browser; use the local app for real repositories
+and model calls. [How the demo works →](docs/pages-demo.md)
 
 > **Project status:** the end-to-end workflow is built. The default demo is a clearly labelled,
 > scripted fixture provider and needs no API key. **Whether staged generation produces better
@@ -215,7 +220,8 @@ npm run build          # production build
 
 **Current boundaries:** one repository per session, regex-based symbol extraction, synchronous
 snapshots capped at 1,500 files / 12 MB, and in-process background work. Local SQLite requires
-persistent storage. This application cannot run on GitHub Pages.
+persistent storage. The full server application needs a server host; the separate browser-only
+[demo frontend](docs/pages-demo.md) is published on GitHub Pages.
 
 <div align="center">
 

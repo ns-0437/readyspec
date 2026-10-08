@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ES2022", "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"], "strict": true,
+    "noUncheckedIndexedAccess": true, "skipLibCheck": true, "types": [],
+    "rootDir": "src", "outDir": "../dist-demo/assets", "noEmitOnError": true
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -22,3 +22,4 @@ jobs:
       - name: Deterministic benchmark (fixture provider; retrieval + checklist only)
         run: npm run eval -- --provider fixture --set dev --systems checklist,staged
       - run: npm run build
+      - run: npm run demo:build

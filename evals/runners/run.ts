@@ -23,16 +23,12 @@ import type { EvalCase } from "./schema";
 import { renderReport, renderVariance } from "./report";
 import { aggregate, scoreRun, type Aggregate, type CaseScore, type SystemName, type SystemOutput } from "./score";
 import { atomicWrite, createRunDir, humanSheet, saveResult, writeOnce } from "./store";
-import { DEFAULT_SAFETY_MARGIN, PILOT_SYSTEMS, planPilot, renderPlan, selectPilotCases } from "./pilot";
+import { DEFAULT_SAFETY_MARGIN, planPilot, renderPlan, selectPilotCases } from "./pilot";
+import { parseEvalArgs, validateSelectedCases } from "./cli";
 import { profileProblems, resolveProfile, type EvalProfile } from "./profile";
 import { runChecklist, runSinglePrompt, runSinglePromptAlphabetical, runStaged } from "./systems";
 
 const RESULTS_DIR = path.resolve(__dirname, "..", "results");
-
-function arg(name: string, fallback: string): string {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 && process.argv[i + 1] ? (process.argv[i + 1] as string) : fallback;
-}
 
 export interface RunOptions {
   provider: LlmProvider;
@@ -186,15 +182,7 @@ export function parseRunLimits(get: (name: string) => string | undefined, live: 
 }
 
 async function main() {
-  const flag = (name: string) => process.argv.includes(`--${name}`);
-  const pilot = flag("pilot");
-  const dryRun = flag("dry-run");
-  const set = pilot ? "dev" : arg("set", "dev");
-  const systems = (pilot ? PILOT_SYSTEMS : (arg("systems", "checklist,single,staged").split(",").map((s) => (s === "single" ? "single_prompt" : s === "single_alphabetical" ? "single_prompt_alphabetical" : s)) as SystemName[]));
-  const only = arg("cases", "").split(",").filter(Boolean);
-  const provider = createProvider(arg("provider", "") ? { ...process.env, READYSPEC_PROVIDER: arg("provider", "") } : process.env);
-  const live = provider.info.kind !== "fixture";
-  const argValue = (n: string) => (process.argv.includes(`--${n}`) ? process.argv[process.argv.indexOf(`--${n}`) + 1] : undefined);
+  const { pilot, dryRun, set, systems, only, repeat, get: argValue, providerTokenLimit } = parseEvalArgs(process.argv.slice(2));
 
   let cases = loadCases();
   let roles: { c: EvalCase; role: string }[];
@@ -206,20 +194,23 @@ async function main() {
     else if (set === "heldout") cases = cases.filter((c) => c.heldOut && c.cohort === "v1");
     else if (set === "heldout-v2") cases = cases.filter((c) => c.heldOut && c.cohort === "v2");
     else if (set !== "all") throw new Error("--set must be dev, heldout, heldout-v2 or all");
+    validateSelectedCases(only, cases);
     if (only.length) cases = cases.filter((c) => only.includes(c.id));
     roles = cases.map((c) => ({ c, role: "selected" }));
     if (set !== "dev") console.warn("NOTE: held-out cases should be run once, after the code is frozen. Do not tune against them.");
   }
-  const repeat = Math.max(1, Number(arg("repeat", "1")) || 1);
+  const providerName = argValue("provider");
+  const provider = createProvider(providerName ? { ...process.env, READYSPEC_PROVIDER: providerName } : process.env);
+  const live = provider.info.kind !== "fixture";
   const profile = resolveProfile(argValue("profile"), { outputs: argValue("output-allowance"), evidenceMaxChars: argValue("evidence-max-chars") });
   const marginRaw = argValue("safety-margin");
   const safetyMargin = marginRaw === undefined ? DEFAULT_SAFETY_MARGIN : Number(marginRaw);
   if (!Number.isFinite(safetyMargin) || safetyMargin < 0 || safetyMargin > 1) throw new Error(`--safety-margin must be between 0 and 1, got "${marginRaw}"`);
   const problems = profileProblems(profile, systems);
-  const note = cases.length === 1 ? "Feasibility check for one development case. It shows whether the requests run and fit; it is not a quality benchmark." : undefined;
+  const note = cases.length === 1 ? "Feasibility check for one selected case. It shows whether the requests run and fit; it is not a quality benchmark." : undefined;
 
   if (dryRun) {
-    const limit = Number(argValue("provider-token-limit")) || undefined;
+    const limit = providerTokenLimit;
     const runLimits = parseRunLimits(argValue, false);
     const plan = planPilot({ cases: roles, systems, prices: getPrices(), providerTokenLimit: limit, profile, safetyMargin });
     console.log(renderPlan(plan, { providerLabel: provider.info.label, systems, providerTokenLimit: limit, runLimitsSet: runLimits !== undefined, problems }));

@@ -68,6 +68,12 @@ not. A single-case run is a feasibility check, not a benchmark. No live call mad
 
 ## Purpose, user, scope
 
+**Eval CLI validation (2026-10-08):** `evals/runners/cli.ts` rejects misspelled/duplicate flags,
+unknown systems/case IDs, invalid repetition counts and conflicting pilot overrides before execution.
+Pilot remains five development cases and one repetition. Tests: `tests/eval-cli.test.ts`.
+Final local validation: `npm run check` passes (277 tests), all 20 fixture tests pass, retrieval
+regression is unchanged, and production build passes. No live model calls or held-out runs.
+
 **Retry cancellation (2026-10-08):** backoff rejects an already-aborted signal and removes its abort
 listener both on timeout and cancellation. Tests cover aborts immediately before and during the wait;
 neither dispatches another request.
@@ -174,7 +180,7 @@ npm test               # vitest
 npm run test:fixtures  # node --test on the demo + shop-orders fixtures' own tests
 npm run check          # lint + typecheck + test
 npm run build          # production build
-npm run eval -- --provider fixture --set dev   # benchmark; --repeat N for variance; --set heldout-v2 ONCE after code freeze (v1 is contaminated)
+npm run eval -- --provider fixture --set dev --systems checklist,staged # key-free retrieval/checklist mechanics
 npm run eval:regression                        # deterministic retrieval-only regression check against evals/baseline-retrieval.json
 npm run smoke:live     # first-contact live check (needs ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY); see docs/live-validation.md
 ```

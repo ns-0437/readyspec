@@ -68,6 +68,11 @@ not. A single-case run is a feasibility check, not a benchmark. No live call mad
 
 ## Purpose, user, scope
 
+**Publishing checks (2026-10-08):** all 246 tests pass locally. CI's key-free benchmark now explicitly
+selects checklist + staged, because fixture runs measure retrieval/checklist mechanics and the
+production output allowances intentionally differ between single-prompt and staged briefs.
+The dev fixture report has been regenerated with durable-run accounting. No live evaluation run.
+
 - **User:** an engineer or tech lead preparing a ticket for implementation.
 - **Flow:** select repo -> enter ticket -> investigate (local) -> review disclosure + consent ->
   answer <=5 clarification questions -> review/edit/approve/export brief. One repo per

@@ -71,6 +71,8 @@ not. A single-case run is a feasibility check, not a benchmark. No live call mad
 **Eval CLI validation (2026-10-08):** `evals/runners/cli.ts` rejects misspelled/duplicate flags,
 unknown systems/case IDs, invalid repetition counts and conflicting pilot overrides before execution.
 Pilot remains five development cases and one repetition. Tests: `tests/eval-cli.test.ts`.
+Final local validation: `npm run check` passes (277 tests), all 20 fixture tests pass, retrieval
+regression is unchanged, and production build passes. No live model calls or held-out runs.
 
 **Retry cancellation (2026-10-08):** backoff rejects an already-aborted signal and removes its abort
 listener both on timeout and cancellation. Tests cover aborts immediately before and during the wait;

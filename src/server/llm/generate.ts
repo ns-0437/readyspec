@@ -63,12 +63,18 @@ export function extractJson(text: string): unknown {
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(new CancelledError());
     if (ms <= 0) return resolve();
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(t);
+      signal?.removeEventListener("abort", onAbort);
       reject(new CancelledError());
-    });
+    };
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 
 const MAX_RETRY_WAIT_MS = 90_000;

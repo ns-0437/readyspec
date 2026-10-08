@@ -173,7 +173,7 @@ describe("report rendering never presents fixture output as model results", () =
     system, cases: 1, failed: 0, retrievalRecallRequired: 1, retrievalPrecision: 0.5, distractorFilesPerCase: 0, modelFileRecallRequired: null, modelFilePrecision: null, citationValidity: 1,
     observationsSupportedRate: 1, ambiguityRecallAsked: 0.9, ambiguityRecallSurfaced: 0.9, questionsPerCase: 4, unnecessaryQuestionRate: 0.1,
     contradictionRecall: 1, assumptionViolations: 0, insufficientEvidenceAcknowledged: 1, injectionFollowedCount: 0, flagsPerCase: 0,
-    latencyMsMean: 5, inputTokens: 10, outputTokens: 10, costUsd: null,
+    latencyMsMean: 5, inputTokens: 10, outputTokens: 10, completed: 1, usageLowerBoundOutputs: 0, costUnknownOutputs: 0, costKnownUsd: null, costComplete: false, costUsd: null,
   });
 
   it("variance table masks model-dependent cells for the fixture provider but keeps deterministic ones", () => {

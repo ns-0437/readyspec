@@ -30,7 +30,13 @@ export interface SystemOutput {
   /** Verifier findings on the produced brief (staged only). */
   verification: { errors: number; warnings: number } | null;
   latencyMs: number;
-  usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number | null };
+  /**
+   * Tokens/cost for the model calls that COMPLETED and reported usage. `exact` is false when the
+   * run ended in an error: the failed request's own usage is unavailable (never invented), so the
+   * numbers are a known lower bound. Undefined means exact only if there was no error. `costUsd`
+   * null means unpriced or unavailable, NOT zero; a known zero is 0.
+   */
+  usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number | null; exact?: boolean };
   context?: { kind: "same_evidence" | "alphabetical"; filesInPrompt: number; filesInRepo: number; truncated: boolean; excerptsInPrompt?: number };
   error?: string;
 }
@@ -149,6 +155,8 @@ export function injectionFollowed(c: EvalCase, o: SystemOutput): boolean {
 export interface CaseScore {
   caseId: string;
   system: SystemName;
+  /** 1-based repetition, set by the runner; absent for ad-hoc scoring. */
+  repetition?: number;
   failed: boolean;
   /** Context coverage: files SUPPLIED to the model (deterministic for staged and the same-evidence baseline). */
   retrieval: ReturnType<typeof scoreRetrieval>;
@@ -214,10 +222,25 @@ export interface Aggregate {
   injectionFollowedCount: number;
   flagsPerCase: number | null;
   latencyMsMean: number | null;
+  /** Known tokens across ALL outputs, failed ones included (lower bound when usageLowerBoundOutputs > 0). */
   inputTokens: number;
   outputTokens: number;
+  /** Outputs that finished without error. Quality metrics above are computed on these only. */
+  completed: number;
+  /** Failed outputs whose own failed request has unavailable usage: totals are a known lower bound. */
+  usageLowerBoundOutputs: number;
+  /** Outputs with no cost figure (unpriced or unavailable); distinct from a known zero. */
+  costUnknownOutputs: number;
+  /** Sum of the cost figures that ARE known; null when none are. */
+  costKnownUsd: number | null;
+  /** True only when every output has a cost figure and no usage is a lower bound. */
+  costComplete: boolean;
+  /** costKnownUsd when costComplete, else null (so it can never be read as a full total). */
   costUsd: number | null;
 }
+
+/** Usage is exact unless the run errored (its failed request has no usage data). */
+export const usageExact = (o: SystemOutput): boolean => o.usage.exact ?? !o.error;
 
 export function aggregate(system: SystemName, scores: CaseScore[], outputs: SystemOutput[]): Aggregate {
   const ok = scores.filter((s) => !s.failed);
@@ -227,7 +250,11 @@ export function aggregate(system: SystemName, scores: CaseScore[], outputs: Syst
   const qTotal = ok.reduce((s, x) => s + x.questions.total, 0);
   const contra = ok.filter((s) => s.contradictions.applicable);
   const insuff = ok.filter((s) => s.insufficientAcknowledged !== null);
-  const costs = okOut.map((o) => o.usage.costUsd);
+  const knownCosts = outputs.map((o) => o.usage.costUsd).filter((c): c is number => c !== null);
+  const costUnknownOutputs = outputs.filter((o) => o.usage.costUsd === null).length;
+  const usageLowerBoundOutputs = outputs.filter((o) => !usageExact(o)).length;
+  const costComplete = outputs.length > 0 && costUnknownOutputs === 0 && usageLowerBoundOutputs === 0;
+  const costKnownUsd = knownCosts.length ? knownCosts.reduce((a, b) => a + b, 0) : null;
   // Retrieval is a deterministic pre-model step for the staged system (investigate() runs before
   // any model call; see systems.ts runStaged), so a case whose LATER model call failed still has
   // real, meaningful retrieval data -- gating these three metrics on `failed` like everything else
@@ -256,8 +283,13 @@ export function aggregate(system: SystemName, scores: CaseScore[], outputs: Syst
     injectionFollowedCount: ok.filter((s) => s.injectionFollowed).length,
     flagsPerCase: mean(ok.map((s) => s.flags)),
     latencyMsMean: mean(okOut.map((o) => o.latencyMs)),
-    inputTokens: okOut.reduce((s, o) => s + o.usage.inputTokens, 0),
-    outputTokens: okOut.reduce((s, o) => s + o.usage.outputTokens, 0),
-    costUsd: costs.length && costs.every((c) => c !== null) ? (costs as number[]).reduce((a, b) => a + b, 0) : null,
+    inputTokens: outputs.reduce((s, o) => s + o.usage.inputTokens, 0),
+    outputTokens: outputs.reduce((s, o) => s + o.usage.outputTokens, 0),
+    completed: ok.length,
+    usageLowerBoundOutputs,
+    costUnknownOutputs,
+    costKnownUsd,
+    costComplete,
+    costUsd: costComplete ? costKnownUsd : null,
   };
 }

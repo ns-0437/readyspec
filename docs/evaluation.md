@@ -77,9 +77,22 @@ npm run eval -- --provider groq --set dev           # needs GROQ_API_KEY (free t
 npm run eval -- --provider anthropic --set heldout-v2  # once, after freezing the code (v1 is contaminated, see decisions.md 13)
 ```
 
-Options: `--systems checklist,single,staged`, `--cases id,id`, `--set dev|heldout|heldout-v2|all`.
-Outputs: `evals/results/<provider>-<set>-latest.md` (table), a timestamped JSON with every raw
-output and score, and, for live runs, `human-scoring-sheet-<set>.csv` to fill in.
+Options: `--systems checklist,single,staged,single_alphabetical`, `--cases id,id`, `--set dev|heldout|heldout-v2|all`, `--repeat N`.
+
+Every run writes to its own directory, `evals/results/runs/<provider>-<set>-<timestamp>-<id>/` (git-ignored):
+`run.json` (configuration, status in_progress/complete/interrupted), `results/rep<N>/<case>__<system>.json`
+(one immutable file per case x system x repetition, saved the moment it finishes, failures included, so an
+interrupted run keeps what completed), `summary.json` (per-repetition aggregates plus an overall aggregate
+pooled over ALL repetitions), `report.md`, and for live runs `scoring-sheet.csv`. The sheet is write-once, one
+row per saved result with its repetition and `output_file`, so human scores can always be matched to the exact
+output. `evals/results/<provider>-<set>-latest.md` is a replaceable convenience copy of the report. There is no
+automatic resume or parallel execution yet.
+
+Accounting: token and cost totals include failed outputs' known usage. A failed request's own usage is
+unavailable and never invented, so such totals are a known lower bound and cost prints as
+"$X known + unknown usage (...)" unless every output has a cost figure. A known zero (the static checklist,
+no model call) is distinct from unavailable or unpriced usage. Quality metrics are computed on completed
+outputs only; completed and failed counts are separate rows.
 
 With the fixture provider, model-dependent cells print `n/a (fixture)`: scripted text is never
 scored as if it were model output.

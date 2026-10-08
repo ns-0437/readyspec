@@ -69,7 +69,8 @@ export const CHECKLIST = [
 
 export async function runChecklist(): Promise<SystemOutput> {
   const t0 = performance.now();
-  return { ...empty("checklist"), questions: CHECKLIST.map((text) => ({ text, why: "" })), latencyMs: performance.now() - t0 };
+  // No model call at all: usage and cost are a KNOWN zero, not unavailable.
+  return { ...empty("checklist"), questions: CHECKLIST.map((text) => ({ text, why: "" })), latencyMs: performance.now() - t0, usage: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0, exact: true } };
 }
 
 /* --------------------------- 2. single-prompt baselines --------------------------- */
@@ -131,7 +132,7 @@ export async function runSinglePrompt(c: EvalCase, provider: LlmProvider): Promi
     out.error = (e as Error).message;
   }
   out.latencyMs = performance.now() - t0;
-  out.usage = finish();
+  out.usage = { ...finish(), exact: !out.error };
   return out;
 }
 
@@ -167,7 +168,7 @@ export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProv
     out.error = (e as Error).message;
   }
   out.latencyMs = performance.now() - t0;
-  out.usage = finish();
+  out.usage = { ...finish(), exact: !out.error };
   return out;
 }
 
@@ -213,6 +214,6 @@ export async function runStaged(c: EvalCase, provider: LlmProvider): Promise<Sys
     out.error = (e as Error).message;
   }
   out.latencyMs = performance.now() - t0;
-  out.usage = finish();
+  out.usage = { ...finish(), exact: !out.error };
   return out;
 }

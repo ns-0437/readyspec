@@ -38,6 +38,12 @@ baseline remains as a secondary (`--systems single_alphabetical`). It measures p
 not a completed clarification loop; remaining asymmetries are listed in docs/evaluation.md. No live
 benchmark has been run with it.
 
+**Durable eval results (2026-10-08):** each `npm run eval` run now has its own directory under
+`evals/results/runs/` with one immutable file per case/system/repetition saved immediately (failures
+included), a write-once human scoring sheet, per-repetition and pooled summaries, and cost totals that
+include failed outputs' known usage and say when usage is unknown. See docs/evaluation.md. No resume or
+parallelism; not run live.
+
 ## Purpose, user, scope
 
 - **User:** an engineer or tech lead preparing a ticket for implementation.

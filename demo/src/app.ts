@@ -1,10 +1,13 @@
 import type { DemoData, DemoEvidence } from "./types.js";
 import { element, button } from "./dom.js";
-import { questions, emptyChoices, createCriteria } from "./model.js";
+import { questions, createCriteria } from "./model.js";
+import { newDraft, changeChoice, criteriaFor, editCriterion, approve, serializeDraft, restoreDraft, exportDraft } from "./draft.js";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 const steps = document.querySelector<HTMLElement>(".steps")!;
-const choices = emptyChoices();
+let draft = newDraft();
+const STORAGE_KEY = "readyspec-static-demo-v1";
+let notice = "";
 let data: DemoData;
 let stage = 0;
 let selectedEvidence = "delivery";
@@ -77,14 +80,15 @@ function decisionsPanel() {
   const intro = element("div", "panel-intro"); intro.append(heading("Three decisions the ticket leaves open."), element("p", "code-note", "Choose an answer or leave it unresolved. Each choice updates the proposed brief; this is deterministic demo logic, not generated advice."));
   panel.append(intro);
   const summary = element("p", "decision-count"); summary.setAttribute("role", "status");
-  const updateCount = () => { summary.textContent = `${Object.values(choices).filter(Boolean).length} of 3 decisions resolved · ${createCriteria(choices).filter((c) => c.blockedBy.length).length} criteria still blocked`; };
+  const updateCount = () => { summary.textContent = `${Object.values(draft.choices).filter(Boolean).length} of 3 decisions resolved · ${createCriteria(draft.choices).filter((c) => c.blockedBy.length).length} criteria still blocked`; };
+  intro.append(element("p", "code-note", "Changing a decision resets edited criteria and clears review approval, keeping the proposed brief consistent with your answers."));
   questions.forEach((q, index) => {
     const field = element("fieldset", "question"); field.append(element("legend", "", `0${index + 1} / ${q.title}`), element("p", "code-note", q.why));
     const link = button("Inspect related evidence ↗", "text-button", () => { selectedEvidence = q.evidenceId; setStage(0); }); field.append(link);
     const options = element("div", "answer-options");
     [...q.options, { id: "", label: "Leave unresolved", detail: "Keep the question visible and its criterion blocked." }].forEach((o) => {
-      const label = element("label", "answer-option"); const radio = element("input", ""); radio.type = "radio"; radio.name = q.id; radio.value = o.id; radio.checked = (choices[q.id] ?? "") === o.id;
-      radio.addEventListener("change", () => { choices[q.id] = o.id || null; updateCount(); });
+      const label = element("label", "answer-option"); const radio = element("input", ""); radio.type = "radio"; radio.name = q.id; radio.value = o.id; radio.checked = (draft.choices[q.id] ?? "") === o.id;
+      radio.addEventListener("change", () => { draft = changeChoice(draft, q.id, o.id || null); updateCount(); });
       const copy = element("span", "", o.label); copy.append(element("small", "", o.detail)); label.append(radio, copy); options.append(label);
     });
     field.append(options); panel.append(field);
@@ -93,18 +97,79 @@ function decisionsPanel() {
 }
 function briefPanel() {
   const panel = element("div", "decision-panel"); panel.append(heading("A plan shaped by your decisions."), element("p", "code-note", "Predefined demo template · proposed acceptance criteria · not model output"));
-  createCriteria(choices).forEach((criterion) => {
-    const card = element("article", "criterion"); card.append(element("span", `tag${criterion.blockedBy.length ? " unresolved" : ""}`, criterion.blockedBy.length ? `${criterion.id} · unresolved dependencies` : `${criterion.id} · proposed`), element("h4", "", criterion.text), element("p", "code-note", `Proposed test: ${criterion.test}`));
+  const open = questions.filter((q) => !draft.choices[q.id]);
+  if (open.length) panel.append(element("p", "open-note", `Unresolved: ${open.map((q) => q.title).join(" ")} These dependencies remain in exported briefs.`));
+  panel.append(element("p", "code-note", "Assumed scope: immediate dispatch only. Retry queues and digests require separate investigation; no implementation or test execution occurs here."));
+  const reviewStatus = element("p", "review-status"); reviewStatus.setAttribute("role", "status");
+  const downloads = element("div", "export-actions");
+  const updateReview = () => {
+    reviewStatus.textContent = draft.approvedBy ? `Demo review recorded by ${draft.approvedBy}. Downloads are enabled.` : "Draft · review the current criteria before exporting.";
+    downloads.querySelectorAll("button").forEach((b) => { b.disabled = !draft.approvedBy; });
+  };
+  criteriaFor(draft).forEach((criterion) => {
+    const card = element("article", "criterion"); card.append(element("span", `tag${criterion.blockedBy.length ? " unresolved" : ""}`, criterion.blockedBy.length ? `${criterion.id} · unresolved dependencies` : `${criterion.id} · proposed`));
+    const label = element("label", "edit-label", `${criterion.id} acceptance criterion`); label.htmlFor = `edit-${criterion.id}`;
+    const edit = element("textarea", "criterion-edit"); edit.id = label.htmlFor; edit.value = criterion.text; edit.maxLength = 2000; edit.rows = 3;
+    edit.addEventListener("input", () => { draft = editCriterion(draft, criterion.id, edit.value); updateReview(); });
+    card.append(label, edit, element("p", "code-note", `Proposed test: ${criterion.test}`));
     card.append(button("Trace to source ↗", "text-button", () => { selectedEvidence = criterion.evidenceId; setStage(0); })); panel.append(card);
   });
-  panel.append(element("p", "code-note", "Review and export controls are available in the full local application.")); return panel;
+  const review = element("section", "review-box"); review.append(element("h4", "", "Review before handoff"), element("p", "code-note", "Links and identifiers cannot prove behavioral correctness. This demo records your acknowledgement only; it does not run the full app's verifier."));
+  const nameLabel = element("label", "edit-label", "Reviewer name or initials"); nameLabel.htmlFor = "reviewer";
+  const name = element("input", "search"); name.id = "reviewer"; name.maxLength = 60; name.placeholder = "e.g. NK"; name.autocomplete = "off";
+  const acknowledgeLabel = element("label", "acknowledge"); const acknowledge = element("input", ""); acknowledge.type = "checkbox";
+  acknowledgeLabel.append(acknowledge, document.createTextNode("I reviewed this scripted brief, including unresolved decisions, and understand it does not prove correctness."));
+  const approveButton = button("Record demo review", "button primary", () => {
+    try { draft = approve(draft, name.value, acknowledge.checked); updateReview(); }
+    catch (error) { reviewStatus.textContent = (error as Error).message; }
+  });
+  const invalidateReview = () => { draft = { ...draft, approvedBy: null }; updateReview(); };
+  acknowledge.addEventListener("change", invalidateReview); name.addEventListener("input", invalidateReview);
+  review.append(nameLabel, name, acknowledgeLabel, approveButton, reviewStatus);
+  ([ ["Markdown", "markdown", "md"], ["JSON", "json", "json"], ["Issue checklist", "issue", "md"] ] as const).forEach(([label, format, extension]) => {
+    downloads.append(button(`Download ${label} ↓`, "button", () => {
+      try {
+        const blob = new Blob([exportDraft(draft, data, format)], { type: format === "json" ? "application/json" : "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob); const link = element("a", ""); link.href = url; link.download = `readyspec-demo-${format}.${extension}`; document.body.append(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        reviewStatus.textContent = "Download requested. The exported brief is labelled as a scripted demo.";
+      } catch (error) { reviewStatus.textContent = (error as Error).message; }
+    }));
+  });
+  updateReview(); review.append(downloads); panel.append(review); return panel;
 }
-function render() { renderNav(); app.replaceChildren(stage === 0 ? evidencePanel() : stage === 1 ? decisionsPanel() : briefPanel()); }
+function render() {
+  renderNav();
+  const toolbar = element("div", "draft-toolbar");
+  const status = element("p", "draft-notice", notice || "Decisions stay in this tab unless you save a draft on this device."); status.setAttribute("role", "status");
+  const actions = element("div", "draft-actions");
+  actions.append(button("Save on this device", "text-button", () => {
+    try { localStorage.setItem(STORAGE_KEY, serializeDraft(draft, data.commit)); notice = "Draft saved on this device. Reviewer names and approval are not saved."; }
+    catch { notice = "Browser storage is unavailable. You can still finish and download this brief."; }
+    status.textContent = notice;
+  }), button("Reset demo", "text-button", () => {
+    if (!window.confirm("Clear this demo's answers, edits, and saved draft? Download a reviewed brief first if you want to keep it.")) return;
+    draft = newDraft();
+    try { localStorage.removeItem(STORAGE_KEY); notice = "Demo reset. Saved draft removed."; }
+    catch { notice = "This tab was reset, but browser storage could not be cleared."; }
+    setStage(0);
+  }));
+  toolbar.append(status, actions);
+  app.replaceChildren(toolbar, stage === 0 ? evidencePanel() : stage === 1 ? decisionsPanel() : briefPanel());
+}
 async function start() {
   const response = await fetch(new URL("./evidence.json", import.meta.url));
   if (!response.ok) throw new Error("Evidence could not be loaded");
   data = await response.json() as DemoData;
   if (data.kind !== "scripted-demo" || data.version !== 1 || data.evidence.length !== 4) throw new Error("Unsupported demo data");
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const restored = restoreDraft(raw, data.commit);
+      if (restored) { draft = restored; notice = "Saved draft restored. Review approval must be recorded again before export."; }
+      else notice = "The saved draft is incompatible with this demo version. Started a fresh draft.";
+    }
+  } catch { notice = "Browser storage is unavailable. This demo still works in the current tab."; }
   render();
 }
 start().catch(() => { app.replaceChildren(element("p", "empty", "The demo assets could not load. Refresh to retry, or open the source repository above.")); });

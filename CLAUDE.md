@@ -8,6 +8,10 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 ## Status (update every milestone)
 
 **Static demo foundation (2026-10-08):** `demo/` is a separate, browser-only TypeScript frontend.
+`demo/src/draft.ts` implements editable criteria, review acknowledgement, labelled Markdown/JSON/issue
+exports, and validated local drafts. Changing decisions clears edits/approval; editing clears approval.
+Saving is explicit, local to the device, and never persists reviewer names or approval. Restore is
+commit-scoped and requires a fresh review. This is distinct from the full app's server verification.
 The evidence explorer filters/selects excerpts and exposes their line numbers and hashes. Three
 predefined product decisions drive proposed criteria and blocked dependencies in `demo/src/model.ts`;
 the app labels this deterministic template as scripted, never as model output.

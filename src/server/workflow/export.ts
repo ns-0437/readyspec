@@ -41,8 +41,8 @@ export function exportMarkdown(d: SessionDetail): string {
     `- **Produced by:** ${b.producedBy.label}; revision ${b.revision}`,
   );
   const v = d.verification;
-  if (v) push(`- **Verification:** ${v.passed ? "passed" : "FAILED"}; ${v.citations.valid}/${v.citations.checked} citations valid; ${v.issues.filter((i) => i.severity === "error").length} error(s), ${v.issues.filter((i) => i.severity === "warning").length} warning(s)`);
-  push("", "Legend: **[OBSERVED]** supported by cited code, **[PROPOSED]** a suggested change, **[ASSUMED]** a stated temporary assumption, **[UNRESOLVED]** needs a human decision.", "");
+  if (v) push(`- **Verification:** ${v.passed ? "structural checks passed" : "structural checks FAILED"} (not a behavioral-correctness check); ${v.citations.valid}/${v.citations.checked} citations valid; ${v.issues.filter((i) => i.severity === "error").length} error(s), ${v.issues.filter((i) => i.severity === "warning").length} warning(s)`);
+  push("", "Legend: **[OBSERVED]** cites code; referenced identifiers were found there (not proof the claim is correct), **[PROPOSED]** a suggested change, **[ASSUMED]** a stated temporary assumption, **[UNRESOLVED]** needs a human decision.", "");
 
   push("## Requested outcome", "", b.requestedOutcome, "");
   push("## Scope", "", "**In scope** [PROPOSED]", ...b.scope.inScope.map((s) => `- ${s}`), "", "**Out of scope** [PROPOSED]", ...b.scope.outOfScope.map((s) => `- ${s}`), "");

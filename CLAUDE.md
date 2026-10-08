@@ -25,6 +25,12 @@ on the `analyze` stage). Everything that runs by default (no key) uses the label
 (scripted output). Benchmark: retrieval + static checklist are real; see evals/REPORT.md for what is
 and is not measured.
 
+**Verification wording (2026-10-08):** the lexical check only finds identifiers in cited lines, so
+the UI/exports now say "Referenced identifiers found" and "Structural checks passed/failed", with a
+note that this does not prove behavioral correctness. Internal enums (`supported`, `passed`) and
+approval gating are unchanged. A regression test documents that opposite claims sharing identifiers
+get the same result. Semantic verification does not exist.
+
 ## Purpose, user, scope
 
 - **User:** an engineer or tech lead preparing a ticket for implementation.

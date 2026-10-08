@@ -35,7 +35,7 @@ export function renderReport(opts: { provider: LlmProvider; set: string; aggs: A
     ["Precision of files used", "retrievalPrecision", pct],
     ["Distractor files used / case", "distractorFilesPerCase", (v) => num(v)],
     ["Citation validity", "citationValidity", pct],
-    ["Observed claims supported by cited code", "observationsSupportedRate", pct],
+    ["Observed claims with referenced identifiers found in cited code", "observationsSupportedRate", pct],
     ["Critical ambiguities asked", "ambiguityRecallAsked", pct],
     ["Critical ambiguities surfaced anywhere", "ambiguityRecallSurfaced", pct],
     ["Questions / case", "questionsPerCase", (v) => num(v, 1)],

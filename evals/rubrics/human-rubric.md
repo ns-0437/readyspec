@@ -50,9 +50,11 @@ Time for a reviewer to edit the brief into something they would approve. Stop at
 
 ## Aggregation
 
-Report the mean of each score per system, with the number of cases. Report every case where a
-system scored 0 on "usable as is". Do not average across held-out and development sets without
-saying so.
+For repeated runs, average each metric across repetitions within a case and system first, then
+average those per-case values so cases with more completed repetitions do not get extra weight.
+Report the number of distinct cases and completed outputs per system, along with the repetition
+count. Keep development and held-out results separate. Report every case where a system scored 0
+on "usable as is", and list missing or partial outputs rather than silently dropping them.
 
 ## Calibration
 

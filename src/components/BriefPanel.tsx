@@ -33,7 +33,7 @@ function Editable({ text, onChange, onRemove, disabled, label }: { text: string;
 const verdictBadge = (r: SupportResult | undefined) => {
   if (!r) return null;
   const cls = r.verdict === "supported" ? "ok" : r.verdict === "weak" ? "neutral" : "bad";
-  return <span className={`badge ${cls}`} title={r.detail}>{r.verdict === "supported" ? "supported by cited code" : r.verdict.replace("_", " ")}</span>;
+  return <span className={`badge ${cls}`} title={r.detail}>{r.verdict === "supported" ? "Referenced identifiers found" : r.verdict.replace("_", " ")}</span>;
 };
 
 export function BriefPanel({ detail, busy, act, selectedCriterion, onSelectCriterion, selectedEvidence, onSelectEvidence }: {
@@ -109,12 +109,12 @@ export function BriefPanel({ detail, busy, act, selectedCriterion, onSelectCrite
         <section className="card stack" aria-label="Verification">
           <div className="card-head" style={{ marginBottom: 0 }}>
             <h2 className="grow">Verification</h2>
-            <span className={`badge ${verification.passed && !stale ? "ok" : "bad"}`}>{stale ? "out of date" : verification.passed ? "passed" : "failed"}</span>
+            <span className={`badge ${verification.passed && !stale ? "ok" : "bad"}`}>{stale ? "out of date" : verification.passed ? "Structural checks passed" : "Structural checks failed"}</span>
           </div>
           <div className="small muted">
             {verification.citations.valid}/{verification.citations.checked} citations valid against snapshot {verification.snapshotId.slice(0, 10)} · {verification.coverage.criteriaWithTest}/{verification.coverage.criteria} criteria have a test · {verification.coverage.stepsLinked}/{verification.coverage.steps} steps linked · {errors.length} error(s), {warnings.length} warning(s)
           </div>
-          <div className="small muted">A valid citation proves the lines exist; the &quot;supported&quot; label is a separate lexical check that the claim&apos;s identifiers appear in those lines.</div>
+          <div className="small muted">Structural checks cover citation validity, identifier matching, test coverage and decisions. A valid citation proves the lines exist and a found identifier proves it is mentioned there; neither proves the claim describes the code's behavior correctly. That needs a human reviewer.</div>
           {verification.issues.length > 0 && (
             <ul className="list">
               {verification.issues.map((i, n) => (

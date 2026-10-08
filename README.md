@@ -134,7 +134,7 @@ Copy `.env.example` to `.env.local`. All optional.
 | `ANTHROPIC_BASE_URL` / `GEMINI_BASE_URL` / `GROQ_BASE_URL` | provider default | Override the API host (testing only) |
 | `READYSPEC_MAX_CALLS` | 14 | Model calls per session (retries count) |
 | `READYSPEC_MAX_INPUT_TOKENS` / `READYSPEC_MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |
-| `READYSPEC_MAX_COST_USD` | unset | Cost ceiling (needs prices) |
+| `READYSPEC_MAX_COST_USD` | unset | Dollar ceiling. Requires both `READYSPEC_PRICE_*` set explicitly (0 allowed), otherwise rejected. Each request is checked against estimated worst-case cost before dispatch; estimates are heuristic, so it is a guard, not an exact billing limit |
 | `READYSPEC_PRICE_IN_PER_MTOK` / `READYSPEC_PRICE_OUT_PER_MTOK` | unset | USD per million tokens. Nothing is hard-coded, so cost shows as unknown until you set them |
 | `READYSPEC_ALLOWED_ROOTS` | fixtures only | Extra repository roots (path-delimited) |
 | `READYSPEC_DB` | `data/readyspec.db` | SQLite file |

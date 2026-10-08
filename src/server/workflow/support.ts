@@ -32,7 +32,7 @@ export function checkableTokens(statement: string): string[] {
 /**
  * Lexical support check: are the code-like things a claim mentions actually present in the
  * cited excerpts? This catches invented identifiers and mis-cited evidence. It cannot prove a
- * claim's meaning is right, so "supported" means "not contradicted by missing references".
+ * claim's meaning is right, so the internal "supported" verdict means only "referenced identifiers were found" (shown in the UI as that).
  */
 export function assessSupport(statement: string, cited: EvidenceItem[]): SupportAssessment {
   if (cited.length === 0) {

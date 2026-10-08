@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import { loadCases } from "../evals/runners/cases";
 import { renderReport, renderVariance } from "../evals/runners/report";
 import { aggregate, type Aggregate, injectionFollowed, matchAnyOf, matchGroup, scoreAmbiguity, scoreAssumptions, scoreContradictions, scoreQuestions, scoreRetrieval, scoreRun, type SystemOutput } from "../evals/runners/score";
-import { CHECKLIST, runChecklist, runStaged, snapshotFor } from "../evals/runners/systems";
+import { CHECKLIST, runChecklist, runSinglePrompt, runSinglePromptAlphabetical, runStaged, snapshotFor } from "../evals/runners/systems";
 import { FixtureProvider } from "@/server/llm/fixture";
 import { demoClarification } from "@/server/llm/fixture/demo-notifications";
 import { retrieveEvidence } from "@/server/repository/search";
+import { ProviderError, type LlmProvider, type LlmRequest } from "@/server/llm/provider";
+import { renderEvidence } from "@/server/llm/prompts";
+import { investigate } from "@/server/workflow/investigate";
 
 const cases = loadCases();
 const byId = (id: string) => cases.find((c) => c.id === id)!;
 
 const blank = (over: Partial<SystemOutput> = {}): SystemOutput => ({
-  system: "staged", files: [], hallucinatedFiles: [], filesFromModel: false, questions: [], observations: [], assumptions: [], criteria: [],
+  system: "staged", contextFiles: [], modelFiles: [], hallucinatedFiles: [], questions: [], observations: [], assumptions: [], criteria: [],
   contradictions: [], insufficientEvidence: [], verification: null, latencyMs: 1, usage: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null }, ...over,
 });
 
@@ -119,7 +122,7 @@ describe("scoring functions", () => {
   });
 
   it("scoreRun + aggregate combine per-case scores; a fully failed run (no files either) is excluded from means", () => {
-    const good = blank({ files: c.expectedFiles.required, questions: [{ text: "What about security alerts during a pause?", why: "" }] });
+    const good = blank({ contextFiles: c.expectedFiles.required, questions: [{ text: "What about security alerts during a pause?", why: "" }] });
     const bad = { ...blank(), error: "provider down" }; // files: [] too -- nothing was ever retrieved
     const scores = [scoreRun(c, good), scoreRun(c, bad)];
     const agg = aggregate("staged", scores, [good, bad]);
@@ -132,7 +135,7 @@ describe("scoring functions", () => {
     // Mirrors runStaged: investigate() retrieves files deterministically before any model call, so
     // a case can have real, correct `files` and still end up with `out.error` set (e.g. a live 429
     // on the analyze/clarify/brief call). That retrieval data must not be thrown away with the case.
-    const succeededRetrievalThenFailed = { ...blank({ files: c.expectedFiles.required }), error: "Model API returned 429: quota exceeded" };
+    const succeededRetrievalThenFailed = { ...blank({ contextFiles: c.expectedFiles.required }), error: "Model API returned 429: quota exceeded" };
     const agg = aggregate("staged", [scoreRun(c, succeededRetrievalThenFailed)], [succeededRetrievalThenFailed]);
     expect(agg.failed).toBe(1);
     expect(agg.retrievalRecallRequired).toBe(1); // not null, not excluded
@@ -144,7 +147,7 @@ describe("systems (fixture provider: deterministic parts only)", () => {
   it("the static checklist retrieves nothing and asks the same questions for every ticket", async () => {
     const a = await runChecklist();
     const b = await runChecklist();
-    expect(a.files).toEqual([]);
+    expect(a.contextFiles).toEqual([]);
     expect(a.questions).toEqual(b.questions);
   });
 
@@ -152,7 +155,7 @@ describe("systems (fixture provider: deterministic parts only)", () => {
     const c = byId("demo-01-pause-notifications");
     const out = await runStaged(c, new FixtureProvider());
     expect(out.error).toBeUndefined();
-    expect(scoreRetrieval(c, out.files).recallRequired).toBe(1);
+    expect(scoreRetrieval(c, out.contextFiles).recallRequired).toBe(1);
     expect(out.verification).not.toBeNull();
   });
 
@@ -167,10 +170,10 @@ describe("systems (fixture provider: deterministic parts only)", () => {
 
 describe("report rendering never presents fixture output as model results", () => {
   const agg = (system: "checklist" | "staged"): Aggregate => ({
-    system, cases: 1, failed: 0, retrievalRecallRequired: 1, retrievalPrecision: 0.5, distractorFilesPerCase: 0, citationValidity: 1,
+    system, cases: 1, failed: 0, retrievalRecallRequired: 1, retrievalPrecision: 0.5, distractorFilesPerCase: 0, modelFileRecallRequired: null, modelFilePrecision: null, citationValidity: 1,
     observationsSupportedRate: 1, ambiguityRecallAsked: 0.9, ambiguityRecallSurfaced: 0.9, questionsPerCase: 4, unnecessaryQuestionRate: 0.1,
     contradictionRecall: 1, assumptionViolations: 0, insufficientEvidenceAcknowledged: 1, injectionFollowedCount: 0, flagsPerCase: 0,
-    latencyMsMean: 5, inputTokens: 10, outputTokens: 10, costUsd: null,
+    latencyMsMean: 5, inputTokens: 10, outputTokens: 10, completed: 1, usageLowerBoundOutputs: 0, costUnknownOutputs: 0, costKnownUsd: null, costComplete: false, costUsd: null,
   });
 
   it("variance table masks model-dependent cells for the fixture provider but keeps deterministic ones", () => {
@@ -185,10 +188,83 @@ describe("report rendering never presents fixture output as model results", () =
 
   it("main table masks the same cells and keeps staged retrieval", () => {
     const md = renderReport({ provider: new FixtureProvider(), set: "dev", aggs: [agg("checklist"), agg("staged")], scores: [], outputs: [], cases: [] });
-    const recall = md.split("\n").find((l) => l.startsWith("| Required-file recall"))!;
+    const recall = md.split("\n").find((l) => l.startsWith("| Context coverage: required-file recall"))!;
     expect(recall).toContain("100%");
     const amb = md.split("\n").find((l) => l.startsWith("| Critical ambiguities asked"))!;
     expect(amb.match(/n\/a \(fixture\)/g)).toHaveLength(1);
     expect(md).toContain("Fixture provider run");
+  });
+});
+
+describe("same-evidence single-prompt baseline (capturing provider, no API calls)", () => {
+  const c = byId("demo-01-pause-notifications");
+  const OUTSIDE = "src/billing/invoice.ts"; // exists in the repo, is not retrieved for this ticket
+
+  /** Records every request. The single-prompt stage returns scripted JSON; any other stage stops the run. */
+  function capture(single: unknown): LlmProvider & { calls: LlmRequest[] } {
+    const calls: LlmRequest[] = [];
+    return {
+      calls,
+      info: { kind: "anthropic", label: "capture", model: "m" },
+      leavesMachine: false,
+      async complete(req) {
+        calls.push(req);
+        if (req.stage === "single_prompt") return { text: JSON.stringify(single), usage: { inputTokens: 1, outputTokens: 1 } };
+        throw new ProviderError("stop after capturing", { retryable: false });
+      },
+    };
+  }
+  const scripted = {
+    observations: [{ id: "o1", statement: "decideDelivery exists", citations: [{ path: "src/notifications/dispatcher.ts", startLine: 13, endLine: 17 }] }],
+    questions: [], assumptions: [], acceptanceCriteria: [],
+    filesToChange: [OUTSIDE],
+  };
+
+  it("gives the baseline and the staged analyze stage identical initial evidence, and nothing else", async () => {
+    const evidence = investigate(snapshotFor(c.repo), c.ticket).evidence;
+    const rendered = renderEvidence(evidence);
+
+    const base = capture(scripted);
+    await runSinglePrompt(c, base);
+    const staged = capture(scripted);
+    await runStaged(c, staged);
+
+    const baseUser = base.calls[0]!.user;
+    const analyzeUser = staged.calls[0]!.user;
+    expect(baseUser).toContain(rendered); // same ids, paths, line ranges, order, text
+    expect(analyzeUser).toContain(rendered);
+    expect(base.calls[0]!.system).toBe(staged.calls[0]!.system);
+
+    const promptPaths = (u: string) => [...u.matchAll(/<repository_excerpt id="([^"]+)" path="([^"]+)" lines="(\d+-\d+)"/g)].map((m) => `${m[1]}|${m[2]}|${m[3]}`);
+    expect(promptPaths(baseUser)).toEqual(promptPaths(analyzeUser));
+    expect(promptPaths(baseUser)).toHaveLength(evidence.length);
+    expect(baseUser).not.toContain("<repository_file"); // the old whole-file context is absent
+    expect(baseUser).not.toContain(OUTSIDE);
+    expect(baseUser).not.toContain("invoiceTotal");
+  });
+
+  it("keeps context coverage and model-selected files separate", async () => {
+    const out = await runSinglePrompt(c, capture(scripted));
+    const retrieved = [...new Set(investigate(snapshotFor(c.repo), c.ticket).evidence.map((e) => e.path))];
+    expect(out.contextFiles).toEqual(retrieved);
+    expect(out.contextFiles).not.toContain(OUTSIDE);
+    expect(out.modelFiles).toEqual(expect.arrayContaining(["src/notifications/dispatcher.ts", OUTSIDE]));
+    const score = scoreRun(c, out);
+    expect(score.retrieval.fileCount).toBe(retrieved.length); // context coverage unaffected by model output
+    expect(score.modelFiles.fileCount).toBe(2);
+    expect(score.modelFiles.distractorHits.length + score.modelFiles.missedRequired.length).toBeGreaterThan(0);
+  });
+
+  it("the staged system reports the same context coverage as the baseline", async () => {
+    const base = await runSinglePrompt(c, capture(scripted));
+    const staged = await runStaged(c, capture(scripted)); // stops after the analyze request; context is set before it
+    expect(staged.contextFiles).toEqual(base.contextFiles);
+  });
+
+  it("keeps the alphabetical baseline as a labelled secondary with its own context", async () => {
+    const out = await runSinglePromptAlphabetical(c, capture(scripted));
+    expect(out.system).toBe("single_prompt_alphabetical");
+    expect(out.context?.kind).toBe("alphabetical");
+    expect(out.contextFiles.length).toBeGreaterThan(0);
   });
 });

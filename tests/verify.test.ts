@@ -191,4 +191,14 @@ describe("lexical support assessment", () => {
   it("accepts a dotted access when both parts appear in the cited lines", () => {
     expect(assessSupport("sets categories.security", [ev("categories: { ...x, security: true }")]).verdict).toBe("supported");
   });
+
+  it("KNOWN LIMITATION: opposite claims using the same identifiers get the same lexical result", () => {
+    const code = ev("function decideDelivery(n) { if (n.category === 'security') return { deliver: true }; return { deliver: false }; }");
+    const true_ = assessSupport("decideDelivery always delivers security notifications", [code]);
+    const false_ = assessSupport("decideDelivery never delivers security notifications", [code]);
+    // Only identifiers are compared, not meaning, so the contradictory claim scores identically.
+    // "supported" therefore means "referenced identifiers found" (the UI wording), not "correct".
+    expect(false_.verdict).toBe(true_.verdict);
+    expect(false_.checked).toEqual(true_.checked);
+  });
 });

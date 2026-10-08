@@ -34,10 +34,16 @@ it is the only clean held-out estimate. Any further tuning requires a new cohort
 ## Systems compared (same snapshot, same retrieval budget)
 
 1. **Static checklist**: five generic questions for every ticket. No repository access, no model.
-2. **Single prompt**: one model call. Repository files in path order up to the same 24,000-character
-   budget the staged retriever gets, no retrieval, no clarification stage, no verifier. Citations
-   are `path:lines`, validated afterwards. (On these small repositories it usually sees the whole
-   repository; the report says how often it was truncated.)
+2. **Single prompt (same evidence), the main baseline**: calls the same `investigate()` as the
+   staged workflow, so it receives the identical initial excerpts (ids, paths, line ranges, order,
+   rendered by the same function), then makes ONE structured call under the same system prompt and
+   provider/model to produce observations, questions and proposed criteria. No separate stages, no
+   verifier. This isolates what staging adds from retrieval quality. It measures pre-answer output
+   quality only: neither system gets human answers, so the benefit of a completed clarification loop
+   is not measured. Citations are `path:lines`, validated afterwards.
+   *Secondary* (`--systems single_alphabetical`): repository files in path order up to the same
+   24,000-character budget, no retrieval. It confounds retrieval with staging, so it is not the main
+   comparison.
 3. **ReadySpec staged**: investigate, analyze, clarify (round 1), then a brief with every question
    *deferred* (nothing is silently decided in an unattended run), then verification.
 
@@ -45,7 +51,8 @@ it is the only clean held-out estimate. Any further tuning requires a new cohort
 
 | Metric | How | Depends on model output |
 |---|---|---|
-| Relevant-file retrieval | Recall of required files; precision against required+helpful; distractors used | Staged: no (deterministic). Single prompt: yes (files it cites or names) |
+| Context coverage | Recall/precision/distractors of the files SUPPLIED to the model | No (deterministic; identical for staged and same-evidence baseline by construction) |
+| Model-selected files | Recall/precision of files the model cited in observations or named as affected (staged: cited + brief components; baseline: cited + `filesToChange`) | Yes. Reported separately; never mixed with context coverage |
 | Evidence correctness | Citation validity (path/range exist) and lexical support of observed claims | Yes |
 | Critical ambiguity detection | Critical ambiguities matched by an asked question (and, separately, surfaced anywhere) | Yes |
 | Unnecessary questions | Questions matching neither a critical ambiguity nor an acceptable topic | Yes |
@@ -70,9 +77,33 @@ npm run eval -- --provider groq --set dev           # needs GROQ_API_KEY (free t
 npm run eval -- --provider anthropic --set heldout-v2  # once, after freezing the code (v1 is contaminated, see decisions.md 13)
 ```
 
-Options: `--systems checklist,single,staged`, `--cases id,id`, `--set dev|heldout|heldout-v2|all`.
-Outputs: `evals/results/<provider>-<set>-latest.md` (table), a timestamped JSON with every raw
-output and score, and, for live runs, `human-scoring-sheet-<set>.csv` to fill in.
+Options: `--systems checklist,single,staged,single_alphabetical`, `--cases id,id`, `--set dev|heldout|heldout-v2|all`, `--repeat N`.
+
+Every run writes to its own directory, `evals/results/runs/<provider>-<set>-<timestamp>-<id>/` (git-ignored):
+`run.json` (configuration, status in_progress/complete/interrupted), `results/rep<N>/<case>__<system>.json`
+(one immutable file per case x system x repetition, saved the moment it finishes, failures included, so an
+interrupted run keeps what completed), `summary.json` (per-repetition aggregates plus an overall aggregate
+pooled over ALL repetitions), `report.md`, and for live runs `scoring-sheet.csv`. The sheet is write-once, one
+row per saved result with its repetition and `output_file`, so human scores can always be matched to the exact
+output. `evals/results/<provider>-<set>-latest.md` is a replaceable convenience copy of the report. There is no
+automatic resume or parallel execution yet.
+
+Run-wide budget: `--max-calls N --max-input-tokens N --max-output-tokens N [--max-cost-usd X]` set one limit shared by every case, system, repetition and retry; it is checked before each provider dispatch (the per-case budget keeps owning each case's own usage, the run budget owns the run-wide limit and totals, each updated once per request). A **live run refuses to start without the first three**; fixture runs need none. When it is exhausted, dispatch stops: completed results stay, the interrupted case is saved as `budget_exhausted` (partial, unscored, not counted as a model failure), and every remaining planned result is listed as NOT RUN in `run-accounting.json` (also holds the run totals and a per-case reconciliation). `--max-cost-usd` needs both `READYSPEC_PRICE_*`. Estimates are heuristic; this is a guard, not a billing guarantee.
+
+Five-case live pilot (same-evidence single prompt vs staged, development cases only, one repetition): `--pilot`. Always dry-run first, which makes no provider calls and prints the cases, expected calls, retry/output allowances, a cost range if prices are set, and stages likely to exceed `--provider-token-limit N`:
+
+```
+npm run eval -- --pilot --dry-run --provider groq --provider-token-limit 8000
+npm run eval -- --pilot --provider groq --max-calls <N> --max-input-tokens <N> --max-output-tokens <N>
+```
+
+Profiles: `--profile default|compact` sets per-stage output allowances (default 6000/4000/10000 and single prompt 6000, unchanged; compact 1500/1000/2500 and single prompt 2500, **initial hypotheses, not validated quality settings**). `--output-allowance stage=N,...` overrides single stages, and `--evidence-max-chars N` applies one retrieval budget to BOTH systems so they still receive identical excerpts. With both systems selected the single-prompt allowance must equal the brief allowance. `--dry-run` also reports system/schema overhead, the `--safety-margin` (default 10% on every input estimate; chars/4 is a heuristic, not tokenization), reserved output, retry exposure, the run-wide budget the plan needs, which stages fit `--provider-token-limit N`, and exactly which excerpts a shared evidence cap excludes (and whether the case's required files survive). A run on one case is labelled a feasibility check, not a quality benchmark.
+
+Accounting: token and cost totals include failed outputs' known usage. A failed request's own usage is
+unavailable and never invented, so such totals are a known lower bound and cost prints as
+"$X known + unknown usage (...)" unless every output has a cost figure. A known zero (the static checklist,
+no model call) is distinct from unavailable or unpriced usage. Quality metrics are computed on completed
+outputs only; completed and failed counts are separate rows.
 
 With the fixture provider, model-dependent cells print `n/a (fixture)`: scripted text is never
 scored as if it were model output.
@@ -88,3 +119,7 @@ scored as if it were model output.
   24,000-character budget and does get truncated (docs/decisions.md 15) — but it is one repository with four
   cases, not yet enough to generalise from, and still needs a live-model run to see whether it changes the answer.
 - Live results will vary run to run; report repeated runs before drawing conclusions.
+- The same-evidence baseline equalises context, provider/model and system prompt, but not everything:
+  staged makes three calls (more total tokens and latency), its prompts are stage-specific, the staged
+  brief runs with every question deferred, and neither side gets human answers. Do not call the
+  comparison fully fair; it is fairer on retrieval than the alphabetical baseline.

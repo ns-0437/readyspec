@@ -78,6 +78,24 @@ CREATE TABLE IF NOT EXISTS usage (
   estimated INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usage_session ON usage(session_id);
+CREATE TABLE IF NOT EXISTS usage_failures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  at TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  charge TEXT NOT NULL,
+  reserved_input INTEGER NOT NULL,
+  reserved_output INTEGER NOT NULL,
+  reserved_cost_usd REAL
+);
+CREATE INDEX IF NOT EXISTS idx_usage_failures_session ON usage_failures(session_id);
+-- failures_tracked = 1 only for sessions created once failed attempts were recorded. Any session already
+-- present without a marker predates tracking (its earlier failed requests were never recorded): 0.
+CREATE TABLE IF NOT EXISTS usage_accounting (
+  session_id TEXT PRIMARY KEY,
+  failures_tracked INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO usage_accounting (session_id, failures_tracked) SELECT id, 0 FROM sessions;
 `;
 
 export function openDatabase(file: string): DatabaseSync {

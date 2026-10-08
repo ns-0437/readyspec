@@ -114,16 +114,21 @@ export class SessionService {
       throw new ConflictError(`Model provider changed since this session was created (${session.provider.label} -> ${provider.info.label}). Start a new session so the disclosure you approved still applies.`);
     }
     const controller = new AbortController();
+    const priorUsage = this.store.getUsage(id);
     const env: StageEnv = {
       provider,
-      budget: new Budget(this.deps.limits, this.store.getUsage(id)),
+      budget: new Budget(this.deps.limits, priorUsage), // throws for a dollar ceiling it cannot honour; nothing has started yet
       signal: controller.signal,
       backoffMs: this.deps.backoffMs,
       onUsage: (s: StageName, u) => this.store.recordUsage(id, s, u),
+      onFailedAttempt: (s: StageName, f) => this.store.recordFailedAttempt(id, s, f),
       onEvent: (s, level, message) => this.store.log(id, s, level, message),
     };
     this.store.setStatus(id, during);
     this.store.log(id, stage, "info", `Started ${stage} with ${provider.info.label}.`);
+    if (priorUsage.failuresTracked === false) {
+      this.store.log(id, stage, "warn", "Earlier failed model requests in this session were not recorded, so call and token totals may undercount what it already used.");
+    }
     const job: Job = { controller, promise: Promise.resolve() };
     this.jobs.set(id, job);
     let current = stage; // the stage that was running when a failure happens, so resume re-runs only that

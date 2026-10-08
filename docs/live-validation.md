@@ -70,7 +70,7 @@ demonstration ticket without error. It prints the questions, citation counts and
 
 - the banner no longer says "Fixture provider", and the consent screen says excerpts are sent to the real provider
 - the activity log shows real token counts (cost shows unless prices are unset)
-- every observed claim's citations resolve and the badge says "supported by cited code" where it should
+- every observed claim's citations resolve and the badge says "Referenced identifiers found" where it should
 - the questions are specific to this repository, at most five, and not answered by the code
 - deferred questions stay in "Open questions"; nothing you did not decide appears under "Decisions"
 - **Cancel** during analysis works and **Resume** continues without repeating finished stages

@@ -118,7 +118,7 @@ describe("generateStructured", () => {
     await expect(run(p, { budget: new Budget({ ...TEST_LIMITS, maxCalls: 1 }, { ...zeroUsage, calls: 1 }) })).rejects.toBeInstanceOf(BudgetExceededError);
     await expect(run(p, { budget: new Budget({ ...TEST_LIMITS, maxInputTokens: 1 }, zeroUsage) })).rejects.toBeInstanceOf(BudgetExceededError);
     await expect(run(p, { budget: new Budget({ ...TEST_LIMITS, maxOutputTokens: 50 }, zeroUsage) })).rejects.toBeInstanceOf(BudgetExceededError);
-    await expect(run(p, { budget: new Budget({ ...TEST_LIMITS, maxCostUsd: 1 }, { ...zeroUsage, costUsd: 2 }) })).rejects.toBeInstanceOf(BudgetExceededError);
+    await expect(run(p, { budget: new Budget({ ...TEST_LIMITS, maxCostUsd: 1 }, { ...zeroUsage, costUsd: 2 }, { inPerMTok: 1, outPerMTok: 1 }) })).rejects.toBeInstanceOf(BudgetExceededError);
     expect(p.calls).toHaveLength(0);
   });
 

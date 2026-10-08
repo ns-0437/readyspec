@@ -112,6 +112,10 @@ providers see only the rendered prompt.
 `sessions`, `snapshots` + `snapshot_files`, `artifacts` (kind, round -> validated JSON),
 `decisions`, `activity`, `usage`. Artifacts are Zod-parsed on read and write.
 
+## Budgets and request accounting
+
+`Budget` (`src/server/llm/budget.ts`) reserves each request just before `provider.complete()`: it prechecks calls, tokens and (with a dollar ceiling) estimated worst-case cost (input estimate incl. the serialized schema, plus maximum output), then counts the attempt. Rejected prechecks are not counted. A response with usage (even one that fails schema validation) replaces the reservation with reported usage; every retry is reserved and checked again. **Actual usage** is only what a provider reported. A dispatched request that returns no usage (any HTTP error status, network failure, timeout, cancellation) is *unknown*: it still consumes a call and keeps a conservative **reserved estimate** (estimated input + maximum output tokens), tracked apart from actual usage and never presented as a charge. Error statuses such as 4xx are not treated as proof of no charge. Only a precheck rejected locally, before anything was sent, costs nothing. Retries stay bounded by the retry limit and the call ceiling. Failed attempts persist as token reservations (`usage_failures`); dollars are derived from the prices configured when the budget is rebuilt, so an attempt that failed while unpriced is not free once a dollar ceiling is enabled, and reported tokens recorded without a cost are repriced the same way (estimated prices on actual tokens). Sessions that predate failed-attempt tracking are marked in `usage_accounting`: they keep running under token/call limits with a warning, but a dollar ceiling is refused for them because their earlier exposure cannot be reconstructed. A dollar ceiling requires explicitly configured finite non-negative prices (0 is valid). Token estimates are chars/4, so the dollar ceiling cannot guarantee an exact billing limit.
+
 ## Provider layer
 
 `LlmProvider.complete(request) -> { text, usage }`. Four implementations, selected by

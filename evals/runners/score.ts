@@ -2,7 +2,7 @@ import type { EvidenceItem, SupportVerdict } from "@/shared/schemas";
 import { assessSupport } from "@/server/workflow/support";
 import type { EvalCase } from "./schema";
 
-export type SystemName = "checklist" | "single_prompt" | "staged";
+export type SystemName = "checklist" | "single_prompt" | "single_prompt_alphabetical" | "staged";
 
 export interface ObservationOut {
   id: string;
@@ -15,12 +15,12 @@ export interface ObservationOut {
 
 export interface SystemOutput {
   system: SystemName;
-  /** Repository files the system says it used/considered. */
-  files: string[];
+  /** Files SUPPLIED to the model as context (retrieved excerpts, or the files in a prompt). Never model output. */
+  contextFiles: string[];
+  /** Files the MODEL cited in observations or named as affected (existing in the snapshot). Never context. */
+  modelFiles: string[];
   /** Files it named that do not exist in the snapshot. */
   hallucinatedFiles: string[];
-  /** True when `files` come from model output rather than a deterministic retriever. */
-  filesFromModel: boolean;
   questions: { text: string; why: string }[];
   observations: ObservationOut[];
   assumptions: string[];
@@ -30,9 +30,17 @@ export interface SystemOutput {
   /** Verifier findings on the produced brief (staged only). */
   verification: { errors: number; warnings: number } | null;
   latencyMs: number;
-  usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number | null };
-  context?: { filesInPrompt: number; filesInRepo: number; truncated: boolean };
+  /**
+   * Tokens/cost for the model calls that COMPLETED and reported usage. `exact` is false when the
+   * run ended in an error: the failed request's own usage is unavailable (never invented), so the
+   * numbers are a known lower bound. Undefined means exact only if there was no error. `costUsd`
+   * null means unpriced or unavailable, NOT zero; a known zero is 0.
+   */
+  usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number | null; exact?: boolean };
+  context?: { kind: "same_evidence" | "alphabetical"; filesInPrompt: number; filesInRepo: number; truncated: boolean; excerptsInPrompt?: number };
   error?: string;
+  /** The evaluation-wide budget refused a request. Not a model-quality failure; the output is incomplete. */
+  budgetExhausted?: boolean;
 }
 
 /* ------------------------------ keyword matching ------------------------------ */
@@ -149,8 +157,13 @@ export function injectionFollowed(c: EvalCase, o: SystemOutput): boolean {
 export interface CaseScore {
   caseId: string;
   system: SystemName;
+  /** 1-based repetition, set by the runner; absent for ad-hoc scoring. */
+  repetition?: number;
   failed: boolean;
+  /** Context coverage: files SUPPLIED to the model (deterministic for staged and the same-evidence baseline). */
   retrieval: ReturnType<typeof scoreRetrieval>;
+  /** Files the MODEL cited or named as affected. Kept apart from context coverage on purpose. */
+  modelFiles: ReturnType<typeof scoreRetrieval>;
   evidence: ReturnType<typeof scoreEvidence>;
   ambiguity: ReturnType<typeof scoreAmbiguity>;
   questions: ReturnType<typeof scoreQuestions>;
@@ -173,7 +186,8 @@ export function scoreRun(c: EvalCase, o: SystemOutput): CaseScore {
     caseId: c.id,
     system: o.system,
     failed: !!o.error,
-    retrieval: scoreRetrieval(c, o.files),
+    retrieval: scoreRetrieval(c, o.contextFiles),
+    modelFiles: scoreRetrieval(c, o.modelFiles),
     evidence,
     ambiguity: scoreAmbiguity(c, o.questions, surfacedExtra),
     questions: scoreQuestions(c, o.questions),
@@ -196,6 +210,8 @@ export interface Aggregate {
   retrievalRecallRequired: number | null;
   retrievalPrecision: number | null;
   distractorFilesPerCase: number | null;
+  modelFileRecallRequired: number | null;
+  modelFilePrecision: number | null;
   citationValidity: number | null;
   observationsSupportedRate: number | null;
   ambiguityRecallAsked: number | null;
@@ -208,10 +224,25 @@ export interface Aggregate {
   injectionFollowedCount: number;
   flagsPerCase: number | null;
   latencyMsMean: number | null;
+  /** Known tokens across ALL outputs, failed ones included (lower bound when usageLowerBoundOutputs > 0). */
   inputTokens: number;
   outputTokens: number;
+  /** Outputs that finished without error. Quality metrics above are computed on these only. */
+  completed: number;
+  /** Failed outputs whose own failed request has unavailable usage: totals are a known lower bound. */
+  usageLowerBoundOutputs: number;
+  /** Outputs with no cost figure (unpriced or unavailable); distinct from a known zero. */
+  costUnknownOutputs: number;
+  /** Sum of the cost figures that ARE known; null when none are. */
+  costKnownUsd: number | null;
+  /** True only when every output has a cost figure and no usage is a lower bound. */
+  costComplete: boolean;
+  /** costKnownUsd when costComplete, else null (so it can never be read as a full total). */
   costUsd: number | null;
 }
+
+/** Usage is exact unless the run errored (its failed request has no usage data). */
+export const usageExact = (o: SystemOutput): boolean => o.usage.exact ?? !o.error;
 
 export function aggregate(system: SystemName, scores: CaseScore[], outputs: SystemOutput[]): Aggregate {
   const ok = scores.filter((s) => !s.failed);
@@ -221,14 +252,18 @@ export function aggregate(system: SystemName, scores: CaseScore[], outputs: Syst
   const qTotal = ok.reduce((s, x) => s + x.questions.total, 0);
   const contra = ok.filter((s) => s.contradictions.applicable);
   const insuff = ok.filter((s) => s.insufficientAcknowledged !== null);
-  const costs = okOut.map((o) => o.usage.costUsd);
+  const knownCosts = outputs.map((o) => o.usage.costUsd).filter((c): c is number => c !== null);
+  const costUnknownOutputs = outputs.filter((o) => o.usage.costUsd === null).length;
+  const usageLowerBoundOutputs = outputs.filter((o) => !usageExact(o)).length;
+  const costComplete = outputs.length > 0 && costUnknownOutputs === 0 && usageLowerBoundOutputs === 0;
+  const costKnownUsd = knownCosts.length ? knownCosts.reduce((a, b) => a + b, 0) : null;
   // Retrieval is a deterministic pre-model step for the staged system (investigate() runs before
   // any model call; see systems.ts runStaged), so a case whose LATER model call failed still has
   // real, meaningful retrieval data -- gating these three metrics on `failed` like everything else
   // silently discarded that data (seen live: every model call failed on a quota limit, and the
   // aggregate table printed "n/a" for retrieval even though all 13 cases had retrieved real,
-  // correct files). For single_prompt, `files` comes FROM the model's citations, so a failed case
-  // genuinely has none; scoring it as 0 recall (not excluding it) is the honest reflection of that.
+  // correct files). Context coverage is deterministic for the staged and same-evidence systems; only
+  // the model-selected file metrics (modelFiles) depend on model output, and those exclude failed cases.
   return {
     system,
     cases: scores.length,
@@ -236,6 +271,8 @@ export function aggregate(system: SystemName, scores: CaseScore[], outputs: Syst
     retrievalRecallRequired: mean(scores.map((s) => s.retrieval.recallRequired)),
     retrievalPrecision: mean(scores.filter((s) => s.retrieval.fileCount > 0).map((s) => s.retrieval.precision)),
     distractorFilesPerCase: mean(scores.map((s) => s.retrieval.distractorHits.length)),
+    modelFileRecallRequired: mean(ok.map((s) => s.modelFiles.recallRequired)),
+    modelFilePrecision: mean(ok.filter((s) => s.modelFiles.fileCount > 0).map((s) => s.modelFiles.precision)),
     citationValidity: cited ? ok.reduce((s, x) => s + x.evidence.citationsValid, 0) / cited : null,
     observationsSupportedRate: obsTotal ? ok.reduce((s, x) => s + x.evidence.supported, 0) / obsTotal : null,
     ambiguityRecallAsked: mean(ok.map((s) => s.ambiguity.recallAsked)),
@@ -248,8 +285,13 @@ export function aggregate(system: SystemName, scores: CaseScore[], outputs: Syst
     injectionFollowedCount: ok.filter((s) => s.injectionFollowed).length,
     flagsPerCase: mean(ok.map((s) => s.flags)),
     latencyMsMean: mean(okOut.map((o) => o.latencyMs)),
-    inputTokens: okOut.reduce((s, o) => s + o.usage.inputTokens, 0),
-    outputTokens: okOut.reduce((s, o) => s + o.usage.outputTokens, 0),
-    costUsd: costs.length && costs.every((c) => c !== null) ? (costs as number[]).reduce((a, b) => a + b, 0) : null,
+    inputTokens: outputs.reduce((s, o) => s + o.usage.inputTokens, 0),
+    outputTokens: outputs.reduce((s, o) => s + o.usage.outputTokens, 0),
+    completed: ok.length,
+    usageLowerBoundOutputs,
+    costUnknownOutputs,
+    costKnownUsd,
+    costComplete,
+    costUsd: costComplete ? costKnownUsd : null,
   };
 }

@@ -1,5 +1,5 @@
 import type { BehaviorAnalysis, BriefContent, ClarificationOutput, SinglePromptOutput, SupportJudgeOutput } from "@/shared/schemas";
-import type { AnalyzeContext, BriefContext, ClarifyContext, JudgeContext, SinglePromptContext } from "../contexts";
+import type { AnalyzeContext, BriefContext, ClarifyContext, JudgeContext } from "../contexts";
 
 /**
  * Mechanical fallback for tickets/repositories without a hand-authored script. It restates which
@@ -78,7 +78,7 @@ export function genericJudge(ctx: JudgeContext): SupportJudgeOutput {
   return { judgements: ctx.items.map((i) => ({ itemId: i.itemId, verdict: "weak" as const, reason: "Fixture provider does not judge support." })) };
 }
 
-export function genericSinglePrompt(ctx: SinglePromptContext): SinglePromptOutput {
+export function genericSinglePrompt(ctx: { ticket: string }): SinglePromptOutput {
   return {
     observations: [],
     questions: [],

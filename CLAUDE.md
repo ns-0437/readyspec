@@ -25,7 +25,53 @@ on the `analyze` stage). Everything that runs by default (no key) uses the label
 (scripted output). Benchmark: retrieval + static checklist are real; see evals/REPORT.md for what is
 and is not measured.
 
+**Verification wording (2026-10-08):** the lexical check only finds identifiers in cited lines, so
+the UI/exports now say "Referenced identifiers found" and "Structural checks passed/failed", with a
+note that this does not prove behavioral correctness. Internal enums (`supported`, `passed`) and
+approval gating are unchanged. A regression test documents that opposite claims sharing identifiers
+get the same result. Semantic verification does not exist.
+
+**Baseline fairness (2026-10-08):** the main single-prompt baseline now receives the identical
+`investigate()` excerpts as the staged workflow (one call, same system prompt/provider). Context
+coverage (files supplied) and model-selected files are separate metrics. The old alphabetical-file
+baseline remains as a secondary (`--systems single_alphabetical`). It measures pre-answer quality,
+not a completed clarification loop; remaining asymmetries are listed in docs/evaluation.md. No live
+benchmark has been run with it.
+
+**Durable eval results (2026-10-08):** each `npm run eval` run now has its own directory under
+`evals/results/runs/` with one immutable file per case/system/repetition saved immediately (failures
+included), a write-once human scoring sheet, per-repetition and pooled summaries, and cost totals that
+include failed outputs' known usage and say when usage is unknown. See docs/evaluation.md. No resume or
+parallelism; not run live.
+
+**Budget accounting (2026-10-08):** every dispatched request attempt (retries and provider failures
+included) is reserved and prechecked before `provider.complete()`; a dollar ceiling now needs explicit
+non-negative prices (0 allowed) or is rejected, and checks estimated worst-case cost per request.
+Failed attempts persist in `usage_failures` as token reservations and are never invented as actual
+usage; no HTTP status is assumed charge-free (4xx included). Dollars are rebuilt from tokens with the
+current prices, so enabling a ceiling later does not treat unpriced history as free; sessions that
+predate tracking are refused a dollar ceiling (`usage_accounting`). Estimates are heuristic (chars/4), so the
+ceiling is not an exact billing guarantee. Not run against live providers.
+
+**Eval-wide budget and pilot (2026-10-08):** `npm run eval` accepts run-wide limits shared by all cases,
+systems, repetitions and retries (`--max-calls/--max-input-tokens/--max-output-tokens/--max-cost-usd`);
+live runs refuse to start without the first three. Exhaustion stops dispatch, keeps completed results,
+saves the interrupted case unscored and lists the rest as not run (`run-accounting.json`), apart from
+model failures. `--pilot --dry-run` plans the five-case same-evidence-vs-staged pilot with zero provider
+calls. No live pilot has been run and no spending limit is authorized yet.
+
+**Compact profile (2026-10-08):** `--profile compact` (output allowances 1500/1000/2500, single prompt 2500;
+unvalidated hypotheses) and `--evidence-max-chars` (one retrieval cap for both systems) make requests fit
+small provider allowances; `--dry-run` shows fit, margin, excluded excerpts and the budget needed. For
+demo-01 against an 8000-token allowance, three of four requests fit with full evidence; the brief does
+not. A single-case run is a feasibility check, not a benchmark. No live call made.
+
 ## Purpose, user, scope
+
+**Publishing checks (2026-10-08):** all 246 tests pass locally. CI's key-free benchmark now explicitly
+selects checklist + staged, because fixture runs measure retrieval/checklist mechanics and the
+production output allowances intentionally differ between single-prompt and staged briefs.
+The dev fixture report has been regenerated with durable-run accounting. No live evaluation run.
 
 - **User:** an engineer or tech lead preparing a ticket for implementation.
 - **Flow:** select repo -> enter ticket -> investigate (local) -> review disclosure + consent ->

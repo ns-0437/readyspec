@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { redactSecrets } from "@/shared/redact";
-import type { Budget } from "./budget";
-import { BudgetExceededError, CancelledError, estimateTokens, ProviderError, type LlmProvider, type StageName } from "./provider";
+import type { Budget, FailedAttempt, Reservation } from "./budget";
+import { BudgetExceededError, CancelledError, estimateTokens, ProviderError, type LlmProvider, type LlmResponse, type StageName } from "./provider";
 
 export interface GenerateOptions<T> {
   provider: LlmProvider;
@@ -20,6 +20,14 @@ export interface GenerateOptions<T> {
   backoffMs?: number;
   onUsage?: (u: { inputTokens: number; outputTokens: number; costUsd: number | null; estimated: boolean }) => void;
   onEvent?: (level: "info" | "warn", message: string) => void;
+  /** A request was dispatched but returned no usable response; persist it so a resume cannot reset the budget. */
+  onFailedAttempt?: (f: FailedAttempt) => void;
+  /**
+   * Evaluation-wide budget shared by every case, system, repetition and retry. Reserved BEFORE the
+   * per-call budget so exhaustion blocks dispatch; both are settled or failed from the same event,
+   * once each, so nothing is counted twice within either.
+   */
+  runBudget?: Budget;
 }
 
 export class StageError extends Error {
@@ -71,6 +79,9 @@ const MAX_RETRY_WAIT_MS = 90_000;
  * shorter than an actual rate-limit window (seen live with Groq: docs/decisions.md 21). Capped so
  * one bad header can't stall a job far longer than any real rate-limit window we've seen.
  */
+/** Extra attempts after the first when a caller does not say otherwise. */
+export const DEFAULT_MAX_RETRIES = 2;
+
 export function computeRetryWaitMs(backoffMs: number, attempt: number, retryAfterMs: number | null): number {
   return Math.min(Math.max(backoffMs * 2 ** attempt, retryAfterMs ?? 0), MAX_RETRY_WAIT_MS);
 }
@@ -80,28 +91,48 @@ export function computeRetryWaitMs(backoffMs: number, attempt: number, retryAfte
  * provider errors and schema-validation failures), and Zod validation of the result.
  */
 export async function generateStructured<T>(opts: GenerateOptions<T>): Promise<T> {
-  const maxRetries = opts.maxRetries ?? 2;
+  const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
   const backoff = opts.backoffMs ?? 600;
   const jsonSchema = z.toJSONSchema(opts.schema, { io: "input", unrepresentable: "any" }) as Record<string, unknown>;
   delete jsonSchema.$schema;
+  const schemaTokens = estimateTokens(JSON.stringify(jsonSchema));
   let user = opts.user;
   let lastProblem = "unknown failure";
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (opts.signal?.aborted) throw new CancelledError();
-    opts.budget.precheck(estimateTokens(opts.system) + estimateTokens(user), opts.maxOutputTokens);
+    // Every attempt, including retries, is checked and counted just before dispatch. The schema is
+    // sent with each request, so it is part of the input estimate. A throw here was never dispatched.
+    const estIn = estimateTokens(opts.system) + estimateTokens(user) + schemaTokens;
+    const runReservation = opts.runBudget?.reserve(estIn, opts.maxOutputTokens);
+    let reservation: Reservation;
     try {
-      const res = await opts.provider.complete({
-        stage: opts.stage,
-        system: opts.system,
-        user,
-        schemaName: opts.schemaName,
-        jsonSchema,
-        maxOutputTokens: opts.maxOutputTokens,
-        signal: opts.signal,
-        context: opts.context,
-      });
-      const cost = opts.budget.record(res.usage.inputTokens, res.usage.outputTokens);
+      reservation = opts.budget.reserve(estIn, opts.maxOutputTokens);
+    } catch (e) {
+      if (runReservation) opts.runBudget!.unreserve(runReservation); // never dispatched: give the run slot back
+      throw e;
+    }
+    try {
+      let res: LlmResponse;
+      try {
+        res = await opts.provider.complete({
+          stage: opts.stage,
+          system: opts.system,
+          user,
+          schemaName: opts.schemaName,
+          jsonSchema,
+          maxOutputTokens: opts.maxOutputTokens,
+          signal: opts.signal,
+          context: opts.context,
+        });
+      } catch (e) {
+        opts.onFailedAttempt?.(opts.budget.fail(reservation));
+        if (runReservation) opts.runBudget!.fail(runReservation);
+        throw e;
+      }
+      // Reported usage replaces the reservation, even if the content below fails validation.
+      const cost = opts.budget.settle(reservation, res.usage.inputTokens, res.usage.outputTokens);
+      if (runReservation) opts.runBudget!.settle(runReservation, res.usage.inputTokens, res.usage.outputTokens);
       opts.onUsage?.({ ...res.usage, costUsd: cost, estimated: opts.provider.info.kind === "fixture" });
 
       let parsed: unknown;

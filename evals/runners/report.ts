@@ -5,12 +5,13 @@ import type { Aggregate, CaseScore, SystemName, SystemOutput } from "./score";
 const pct = (x: number | null) => (x === null ? "n/a" : `${(x * 100).toFixed(0)}%`);
 const num = (x: number | null, d = 2) => (x === null ? "n/a" : x.toFixed(d));
 
-export const LABEL: Record<SystemName, string> = { checklist: "Static checklist", single_prompt: "Single prompt", staged: "ReadySpec staged" };
+export const LABEL: Record<SystemName, string> = { checklist: "Static checklist", single_prompt: "Single prompt (same evidence)", single_prompt_alphabetical: "Single prompt (alphabetical files, secondary)", staged: "ReadySpec staged" };
 
 /** Which aggregate fields are real (not derived from model output) for a system under the fixture provider. */
 export function realUnderFixture(system: SystemName, field: keyof Aggregate): boolean {
   if (system === "checklist") return true;
-  if (system === "staged") return ["retrievalRecallRequired", "retrievalPrecision", "distractorFilesPerCase", "cases", "failed", "system"].includes(field);
+  if (system === "staged") return ["retrievalRecallRequired", "retrievalPrecision", "distractorFilesPerCase", "cases", "completed", "failed", "system"].includes(field);
+  if (system === "single_prompt" || system === "single_prompt_alphabetical") return ["retrievalRecallRequired", "retrievalPrecision", "distractorFilesPerCase", "cases", "system"].includes(field);
   return ["cases", "system"].includes(field);
 }
 
@@ -31,11 +32,13 @@ export function renderReport(opts: { provider: LlmProvider; set: string; aggs: A
   L.push(`Cases: ${cases.length} (${cases.filter((c) => c.heldOut).length} held out). Generated ${new Date().toISOString()}.`, "");
 
   const rows: [string, keyof Aggregate, (v: number | null) => string][] = [
-    ["Required-file recall (retrieval)", "retrievalRecallRequired", pct],
-    ["Precision of files used", "retrievalPrecision", pct],
-    ["Distractor files used / case", "distractorFilesPerCase", (v) => num(v)],
+    ["Context coverage: required-file recall (files supplied to the model)", "retrievalRecallRequired", pct],
+    ["Context coverage: precision of files supplied", "retrievalPrecision", pct],
+    ["Context coverage: distractor files supplied / case", "distractorFilesPerCase", (v) => num(v)],
+    ["Model-selected files: required-file recall (cited or named as affected)", "modelFileRecallRequired", pct],
+    ["Model-selected files: precision", "modelFilePrecision", pct],
     ["Citation validity", "citationValidity", pct],
-    ["Observed claims supported by cited code", "observationsSupportedRate", pct],
+    ["Observed claims with referenced identifiers found in cited code", "observationsSupportedRate", pct],
     ["Critical ambiguities asked", "ambiguityRecallAsked", pct],
     ["Critical ambiguities surfaced anywhere", "ambiguityRecallSurfaced", pct],
     ["Questions / case", "questionsPerCase", (v) => num(v, 1)],
@@ -46,30 +49,44 @@ export function renderReport(opts: { provider: LlmProvider; set: string; aggs: A
     ["Followed planted injection (cases)", "injectionFollowedCount", (v) => String(v)],
     ["Reviewer-flag proxy / case", "flagsPerCase", (v) => num(v, 1)],
     ["Mean latency (ms)", "latencyMsMean", (v) => (v === null ? "n/a" : v.toFixed(0))],
-    ["Input tokens (total)", "inputTokens", (v) => String(v)],
-    ["Output tokens (total)", "outputTokens", (v) => String(v)],
-    ["Cost (USD, needs READYSPEC_PRICE_*)", "costUsd", (v) => (v === null ? "n/a" : `$${v.toFixed(4)}`)],
-    ["Failed cases (system error)", "failed", (v) => String(v)],
+    ["Input tokens (known, incl. failed outputs)", "inputTokens", (v) => String(v)],
+    ["Output tokens (known, incl. failed outputs)", "outputTokens", (v) => String(v)],
+    ["Completed outputs", "completed", (v) => String(v)],
+    ["Failed outputs (system error)", "failed", (v) => String(v)],
+    ["Failed outputs with usage unavailable (token totals are a lower bound)", "usageLowerBoundOutputs", (v) => String(v)],
   ];
   L.push(`| Metric | ${aggs.map((a) => LABEL[a.system]).join(" | ")} |`, `|---|${aggs.map(() => "---").join("|")}|`);
   for (const [name, field, f] of rows) L.push(`| ${name} | ${aggs.map((a) => cell(a, field, f)).join(" | ")} |`);
+  L.push(`| Cost (USD, needs READYSPEC_PRICE_*) | ${aggs.map((a) => (fixture && a.system !== "checklist" ? "n/a (fixture)" : costCell(a))).join(" | ")} |`);
+  L.push("", "Quality metrics (citation validity, ambiguity, question, contradiction, assumption, insufficient-evidence, injection, flag rows, and model-selected files) are computed on COMPLETED outputs only; failed outputs are excluded from them and counted in the rows above. Context-coverage rows include every output because retrieval runs before any model call. Token and cost rows include failed outputs' known usage.");
 
-  const ctxNote = outputs.find((o) => o.system === "single_prompt" && o.context);
-  if (ctxNote?.context) {
-    const truncatedCases = outputs.filter((o) => o.system === "single_prompt" && o.context?.truncated).length;
-    L.push("", `Single-prompt baseline context: ${truncatedCases} of ${outputs.filter((o) => o.system === "single_prompt").length} cases were truncated to the ${24_000}-character budget; otherwise it saw the whole repository (so retrieval gives ReadySpec no advantage on small repositories).`);
+  const sp = outputs.filter((o) => o.system === "single_prompt" || o.system === "single_prompt_alphabetical");
+  if (sp.some((o) => o.system === "single_prompt")) {
+    L.push("", "Single prompt (same evidence) receives exactly the retrieved excerpts the staged workflow receives, in one call, so its context-coverage rows equal staged by construction; differences below come from staging, not retrieval. It measures pre-answer output quality only: neither system gets human answers, so the benefit of a completed clarification loop is not measured. Context coverage (files supplied) and model-selected files (cited or named by the model) are separate rows and must not be added together.");
+  }
+  const alpha = sp.filter((o) => o.system === "single_prompt_alphabetical" && o.context);
+  if (alpha.length) {
+    L.push("", `Secondary alphabetical baseline: ${alpha.filter((o) => o.context?.truncated).length} of ${alpha.length} cases were truncated to the ${24_000}-character budget; it confounds retrieval with staging.`);
   }
 
-  L.push("", "## Per-case detail (staged workflow and checklist)", "", "| Case | Held out | System | Req. files | Missed required | Ambiguities asked | Missed | Unnecessary Qs | Violations | Contradictions |", "|---|---|---|---|---|---|---|---|---|---|");
+  L.push("", "## Per-case detail (staged workflow and checklist)", "", "| Case | Rep | Held out | System | Req. files | Missed required | Ambiguities asked | Missed | Unnecessary Qs | Violations | Contradictions |", "|---|---|---|---|---|---|---|---|---|---|---|");
   for (const s of scores) {
     const c = cases.find((x) => x.id === s.caseId)!;
     if (fixture && s.system !== "checklist" && s.system !== "staged") continue;
     const modelCells = fixture && s.system === "staged";
     const n = (v: string) => (modelCells ? "n/a" : v);
-    L.push(`| ${s.caseId} | ${c.heldOut ? "yes" : ""} | ${LABEL[s.system]} | ${pct(s.retrieval.recallRequired)} | ${s.retrieval.missedRequired.join(", ") || "-"} | ${n(`${s.ambiguity.coveredAsked.length}/${s.ambiguity.total}`)} | ${n(s.ambiguity.missedAsked.join(", ") || "-")} | ${n(String(s.questions.unnecessary))} | ${n(s.assumptions.violations.map((v) => v.id).join(", ") || "-")} | ${n(s.contradictions.applicable ? `${s.contradictions.covered.length}/${s.contradictions.covered.length + s.contradictions.missed.length}` : "-")} |`);
+    L.push(`| ${s.caseId} | ${s.repetition ?? "-"} | ${c.heldOut ? "yes" : ""} | ${LABEL[s.system]} | ${pct(s.retrieval.recallRequired)} | ${s.retrieval.missedRequired.join(", ") || "-"} | ${n(`${s.ambiguity.coveredAsked.length}/${s.ambiguity.total}`)} | ${n(s.ambiguity.missedAsked.join(", ") || "-")} | ${n(String(s.questions.unnecessary))} | ${n(s.assumptions.violations.map((v) => v.id).join(", ") || "-")} | ${n(s.contradictions.applicable ? `${s.contradictions.covered.length}/${s.contradictions.covered.length + s.contradictions.missed.length}` : "-")} |`);
   }
   L.push("");
   return L.join("\n");
+}
+
+/** Total cost, or the known part labelled as incomplete. Unavailable usage is never invented. */
+export function costCell(a: Aggregate): string {
+  if (a.costComplete) return `$${(a.costKnownUsd ?? 0).toFixed(4)}`;
+  const known = a.costKnownUsd === null ? null : `$${a.costKnownUsd.toFixed(4)}`;
+  const why = [a.costUnknownOutputs ? `${a.costUnknownOutputs} output(s) with no cost figure` : "", a.usageLowerBoundOutputs ? `${a.usageLowerBoundOutputs} failed output(s) with unavailable usage` : ""].filter(Boolean).join(", ");
+  return known ? `${known} known + unknown usage (${why})` : `n/a (${why || "no outputs"})`;
 }
 
 /** mean (min-max) across repeated runs for the metrics most sensitive to model variance. */

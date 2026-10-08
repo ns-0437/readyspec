@@ -63,9 +63,12 @@ export class CancelledError extends Error {
 }
 
 export class BudgetExceededError extends Error {
-  constructor(message: string) {
+  /** "run" = the evaluation-wide limit (not a model-quality failure); "session" = a per-session or per-case limit. */
+  readonly scope: "session" | "run";
+  constructor(message: string, scope: "session" | "run" = "session") {
     super(message);
     this.name = "BudgetExceededError";
+    this.scope = scope;
   }
 }
 

@@ -356,6 +356,16 @@ export const Usage = z.object({
   outputTokens: z.number().int(),
   costUsd: z.number().nullable(),
   estimated: z.boolean(),
+  /** Dispatched requests that returned no usable response (they still count against the call ceiling). */
+  failedAttempts: z.number().int().optional(),
+  /** Estimated exposure of those failed attempts (estimated input + maximum output). NOT actual usage. */
+  uncertainInputTokens: z.number().int().optional(),
+  uncertainOutputTokens: z.number().int().optional(),
+  /** Reported tokens from calls whose cost was unknown when recorded (no prices then); repriced if a dollar ceiling is enabled later. */
+  unpricedInputTokens: z.number().int().optional(),
+  unpricedOutputTokens: z.number().int().optional(),
+  /** False when earlier failed attempts were not (fully) recorded, so past exposure cannot be reconstructed. */
+  failuresTracked: z.boolean().optional(),
 });
 export type Usage = z.infer<typeof Usage>;
 

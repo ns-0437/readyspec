@@ -68,6 +68,10 @@ not. A single-case run is a feasibility check, not a benchmark. No live call mad
 
 ## Purpose, user, scope
 
+**Clarification identity (2026-10-08):** questions deduplicate within a round as well as against
+history; normalization preserves Unicode letters/numbers. IDs cannot collide with previous questions,
+recorded decisions, or earlier questions in the same model response. Regression tests: `tests/clarify.test.ts`.
+
 **README presentation (2026-10-08):** README now includes a repository-local SVG banner, expandable
 walkthrough/configuration/code-map sections, Mermaid workflow, and an explicit measured-vs-unproven
 table. `docs/assets/readyspec-hero.svg` is hand-authored vector artwork; the walkthrough is labelled

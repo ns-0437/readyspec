@@ -15,6 +15,9 @@ import { generateStructured } from "@/server/llm/generate";
 import type { LlmProvider, StageName } from "@/server/llm/provider";
 import { analyzePrompt, briefPrompt, clarifyPrompt, judgePrompt, SYSTEM_PROMPT } from "@/server/llm/prompts";
 
+/** Maximum output tokens requested per stage (also used by the single-prompt baseline and dry-run planning). */
+export const STAGE_MAX_OUTPUT = { analyze: 6000, clarify: 4000, brief: 10000, single_prompt: 6000 } as const;
+
 /** Everything a model stage needs from its host; keeps stages free of persistence and HTTP. */
 export interface StageEnv {
   provider: LlmProvider;
@@ -24,6 +27,8 @@ export interface StageEnv {
   onUsage: (stage: StageName, u: { inputTokens: number; outputTokens: number; costUsd: number | null; estimated: boolean }) => void;
   onEvent: (stage: string, level: "info" | "warn", message: string) => void;
   onFailedAttempt?: (stage: StageName, f: FailedAttempt) => void;
+  /** Evaluation-wide budget (evals only); sessions leave it unset. */
+  runBudget?: Budget;
 }
 
 const call = <T>(env: StageEnv, stage: StageName, schemaName: string, schema: import("zod").ZodType<T>, user: string, context: unknown, maxOutputTokens: number) =>
@@ -42,6 +47,7 @@ const call = <T>(env: StageEnv, stage: StageName, schemaName: string, schema: im
     onUsage: (u) => env.onUsage(stage, u),
     onEvent: (level, message) => env.onEvent(stage, level, message),
     onFailedAttempt: (f) => env.onFailedAttempt?.(stage, f),
+    runBudget: env.runBudget,
   });
 
 const keepKnown = (ids: string[], known: Set<string>): { kept: string[]; dropped: number } => {
@@ -52,7 +58,7 @@ const keepKnown = (ids: string[], known: Set<string>): { kept: string[]; dropped
 /* ------------------------------ behavior analysis ------------------------------ */
 
 export async function runAnalyze(env: StageEnv, ctx: AnalyzeContext): Promise<BehaviorAnalysis> {
-  const raw = await call(env, "analyze", "BehaviorAnalysis", BehaviorAnalysis, analyzePrompt(ctx), ctx, 6000);
+  const raw = await call(env, "analyze", "BehaviorAnalysis", BehaviorAnalysis, analyzePrompt(ctx), ctx, STAGE_MAX_OUTPUT.analyze);
   const known = new Set(ctx.evidence.map((e) => e.id));
   let dropped = 0;
   const insufficient = [...raw.insufficientEvidence];
@@ -84,7 +90,7 @@ export async function runAnalyze(env: StageEnv, ctx: AnalyzeContext): Promise<Be
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 export async function runClarify(env: StageEnv, ctx: ClarifyContext): Promise<ClarificationOutput> {
-  const raw = await call(env, "clarify", "ClarificationOutput", ClarificationOutput, clarifyPrompt(ctx), ctx, 4000);
+  const raw = await call(env, "clarify", "ClarificationOutput", ClarificationOutput, clarifyPrompt(ctx), ctx, STAGE_MAX_OUTPUT.clarify);
   const known = new Set(ctx.evidence.map((e) => e.id));
   const asked = new Set([...ctx.priorQuestions, ...ctx.decisions.map((d) => ({ text: d.question }))].map((q) => norm(q.text)));
   const usedIds = new Set(ctx.priorQuestions.map((q) => q.id));
@@ -109,7 +115,7 @@ export interface BriefResult {
 }
 
 export async function runBrief(env: StageEnv, ctx: BriefContext): Promise<BriefResult> {
-  const raw = await call(env, "brief", "BriefContent", BriefContent, briefPrompt(ctx), ctx, 10000);
+  const raw = await call(env, "brief", "BriefContent", BriefContent, briefPrompt(ctx), ctx, STAGE_MAX_OUTPUT.brief);
   const known = new Set(ctx.evidence.map((e) => e.id));
   const repairs: string[] = [];
   let dropped = 0;

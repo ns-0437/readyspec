@@ -88,6 +88,15 @@ row per saved result with its repetition and `output_file`, so human scores can 
 output. `evals/results/<provider>-<set>-latest.md` is a replaceable convenience copy of the report. There is no
 automatic resume or parallel execution yet.
 
+Run-wide budget: `--max-calls N --max-input-tokens N --max-output-tokens N [--max-cost-usd X]` set one limit shared by every case, system, repetition and retry; it is checked before each provider dispatch (the per-case budget keeps owning each case's own usage, the run budget owns the run-wide limit and totals, each updated once per request). A **live run refuses to start without the first three**; fixture runs need none. When it is exhausted, dispatch stops: completed results stay, the interrupted case is saved as `budget_exhausted` (partial, unscored, not counted as a model failure), and every remaining planned result is listed as NOT RUN in `run-accounting.json` (also holds the run totals and a per-case reconciliation). `--max-cost-usd` needs both `READYSPEC_PRICE_*`. Estimates are heuristic; this is a guard, not a billing guarantee.
+
+Five-case live pilot (same-evidence single prompt vs staged, development cases only, one repetition): `--pilot`. Always dry-run first, which makes no provider calls and prints the cases, expected calls, retry/output allowances, a cost range if prices are set, and stages likely to exceed `--provider-token-limit N`:
+
+```
+npm run eval -- --pilot --dry-run --provider groq --provider-token-limit 8000
+npm run eval -- --pilot --provider groq --max-calls <N> --max-input-tokens <N> --max-output-tokens <N>
+```
+
 Accounting: token and cost totals include failed outputs' known usage. A failed request's own usage is
 unavailable and never invented, so such totals are a known lower bound and cost prints as
 "$X known + unknown usage (...)" unless every output has a cost figure. A known zero (the static checklist,

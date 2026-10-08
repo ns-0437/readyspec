@@ -76,6 +76,18 @@ export interface FailedAttempt {
   reservedOutputTokens: number;
 }
 
+export interface BudgetTotals {
+  attempts: number;
+  settledCalls: number;
+  failedAttempts: number;
+  reportedInputTokens: number;
+  reportedOutputTokens: number;
+  uncertainInputTokens: number;
+  uncertainOutputTokens: number;
+  /** Reported cost plus the priced estimate of uncertain exposure; null when no prices are configured. An estimate, not a bill. */
+  estimatedCostUsd: number | null;
+}
+
 const EPS = 1e-9;
 
 /**
@@ -99,6 +111,12 @@ export class Budget {
   private input: number; // reported + uncertain reservations
   private output: number;
   private cost: number;
+  private reportedIn = 0;
+  private reportedOut = 0;
+  private uncertainIn: number;
+  private uncertainOut: number;
+  private settledCalls = 0;
+  private failedCalls = 0;
   private pendingInput = 0;
   private pendingOutput = 0;
   private pendingCost = 0;
@@ -107,6 +125,7 @@ export class Budget {
     readonly limits: SessionLimits,
     prior: Usage,
     private readonly prices: Prices | null = getPrices(),
+    private readonly scope: "session" | "run" = "session",
   ) {
     if (limits.maxCostUsd !== null && prices === null) {
       throw new BudgetConfigError(
@@ -120,6 +139,12 @@ export class Budget {
     }
     const uncertainIn = prior.uncertainInputTokens ?? 0;
     const uncertainOut = prior.uncertainOutputTokens ?? 0;
+    this.uncertainIn = uncertainIn;
+    this.uncertainOut = uncertainOut;
+    this.reportedIn = prior.inputTokens;
+    this.reportedOut = prior.outputTokens;
+    this.settledCalls = prior.calls;
+    this.failedCalls = prior.failedAttempts ?? 0;
     this.attempts = prior.calls + (prior.failedAttempts ?? 0);
     this.input = prior.inputTokens + uncertainIn;
     this.output = prior.outputTokens + uncertainOut;
@@ -135,18 +160,18 @@ export class Budget {
 
   /** Throws BudgetExceededError (nothing counted) if this request could breach a ceiling; otherwise counts the attempt. */
   reserve(estInputTokens: number, maxOutputTokens: number): Reservation {
-    if (this.attempts + 1 > this.limits.maxCalls) throw new BudgetExceededError(`Model call limit reached (${this.limits.maxCalls})`);
+    if (this.attempts + 1 > this.limits.maxCalls) throw new BudgetExceededError(`${this.label()} model call limit reached (${this.limits.maxCalls})`, this.scope);
     if (this.input + this.pendingInput + estInputTokens > this.limits.maxInputTokens) {
-      throw new BudgetExceededError(`Input token limit would be exceeded (${this.limits.maxInputTokens})`);
+      throw new BudgetExceededError(`${this.label()} input token limit would be exceeded (${this.limits.maxInputTokens})`, this.scope);
     }
     if (this.output + this.pendingOutput + maxOutputTokens > this.limits.maxOutputTokens) {
-      throw new BudgetExceededError(`Output token limit would be exceeded (${this.limits.maxOutputTokens})`);
+      throw new BudgetExceededError(`${this.label()} output token limit would be exceeded (${this.limits.maxOutputTokens})`, this.scope);
     }
     const estCostUsd = costUsd(estInputTokens, maxOutputTokens, this.prices);
     if (this.limits.maxCostUsd !== null && estCostUsd !== null) {
       const projected = this.cost + this.pendingCost + estCostUsd;
       if (projected > this.limits.maxCostUsd + EPS) {
-        throw new BudgetExceededError(`Cost limit would be exceeded ($${this.limits.maxCostUsd}; spent or reserved $${(this.cost + this.pendingCost).toFixed(4)} + this request up to $${estCostUsd.toFixed(4)})`);
+        throw new BudgetExceededError(`${this.label()} cost limit would be exceeded ($${this.limits.maxCostUsd}; spent or reserved $${(this.cost + this.pendingCost).toFixed(4)} + this request up to $${estCostUsd.toFixed(4)})`, this.scope);
       }
     }
     this.attempts += 1;
@@ -154,6 +179,33 @@ export class Budget {
     this.pendingOutput += maxOutputTokens;
     this.pendingCost += estCostUsd ?? 0;
     return { estInputTokens, maxOutputTokens, estCostUsd };
+  }
+
+  private label(): string {
+    return this.scope === "run" ? "Run-wide" : "Session";
+  }
+
+  /**
+   * Cancels a reservation whose request was never dispatched (a different budget refused it first),
+   * giving back the attempt slot. Never use for a request that was actually sent: that is fail().
+   */
+  unreserve(r: Reservation): void {
+    this.release(r);
+    this.attempts -= 1;
+  }
+
+  /** Counters for reporting. reported* is what providers said they used; uncertain* is estimated exposure of unanswered requests (not actual usage). */
+  totals(): BudgetTotals {
+    return {
+      attempts: this.attempts,
+      settledCalls: this.settledCalls,
+      failedAttempts: this.failedCalls,
+      reportedInputTokens: this.reportedIn,
+      reportedOutputTokens: this.reportedOut,
+      uncertainInputTokens: this.uncertainIn,
+      uncertainOutputTokens: this.uncertainOut,
+      estimatedCostUsd: this.prices ? this.cost : null,
+    };
   }
 
   private release(r: Reservation): void {
@@ -167,6 +219,9 @@ export class Budget {
     this.release(r);
     this.input += inputTokens;
     this.output += outputTokens;
+    this.reportedIn += inputTokens;
+    this.reportedOut += outputTokens;
+    this.settledCalls += 1;
     const c = costUsd(inputTokens, outputTokens, this.prices);
     if (c !== null) this.cost += c;
     return c;
@@ -177,6 +232,9 @@ export class Budget {
     this.release(r);
     this.input += r.estInputTokens;
     this.output += r.maxOutputTokens;
+    this.uncertainIn += r.estInputTokens;
+    this.uncertainOut += r.maxOutputTokens;
+    this.failedCalls += 1;
     this.cost += r.estCostUsd ?? 0;
     return { reservedInputTokens: r.estInputTokens, reservedOutputTokens: r.maxOutputTokens };
   }

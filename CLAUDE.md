@@ -53,6 +53,13 @@ current prices, so enabling a ceiling later does not treat unpriced history as f
 predate tracking are refused a dollar ceiling (`usage_accounting`). Estimates are heuristic (chars/4), so the
 ceiling is not an exact billing guarantee. Not run against live providers.
 
+**Eval-wide budget and pilot (2026-10-08):** `npm run eval` accepts run-wide limits shared by all cases,
+systems, repetitions and retries (`--max-calls/--max-input-tokens/--max-output-tokens/--max-cost-usd`);
+live runs refuse to start without the first three. Exhaustion stops dispatch, keeps completed results,
+saves the interrupted case unscored and lists the rest as not run (`run-accounting.json`), apart from
+model failures. `--pilot --dry-run` plans the five-case same-evidence-vs-staged pilot with zero provider
+calls. No live pilot has been run and no spending limit is authorized yet.
+
 ## Purpose, user, scope
 
 - **User:** an engineer or tech lead preparing a ticket for implementation.

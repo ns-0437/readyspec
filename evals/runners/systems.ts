@@ -1,7 +1,7 @@
 import path from "node:path";
 import { Budget, costUsd } from "@/server/llm/budget";
 import { generateStructured } from "@/server/llm/generate";
-import type { LlmProvider } from "@/server/llm/provider";
+import { BudgetExceededError, type LlmProvider } from "@/server/llm/provider";
 import type { SinglePromptEvidenceContext } from "@/server/llm/contexts";
 import { SYSTEM_PROMPT, singlePromptEvidencePrompt, singlePromptPrompt } from "@/server/llm/prompts";
 import { buildEvidence } from "@/server/repository/evidence";
@@ -9,7 +9,7 @@ import { DEFAULT_RETRIEVAL } from "@/server/repository/search";
 import { createSnapshot } from "@/server/repository/snapshot";
 import type { Snapshot } from "@/server/repository/types";
 import { investigate } from "@/server/workflow/investigate";
-import { runAnalyze, runBrief, runClarify, type StageEnv } from "@/server/workflow/stages";
+import { runAnalyze, runBrief, runClarify, STAGE_MAX_OUTPUT, type StageEnv } from "@/server/workflow/stages";
 import { verifyBrief } from "@/server/workflow/verify";
 import { SinglePromptOutput, type Decision, type EvidenceItem } from "@/shared/schemas";
 import type { EvalCase } from "./schema";
@@ -35,12 +35,18 @@ export function snapshotFor(repo: EvalCase["repo"]): Snapshot {
 
 const HIGH = { maxCalls: 50, maxInputTokens: 2_000_000, maxOutputTokens: 500_000, maxCostUsd: null };
 
-function makeEnv(provider: LlmProvider) {
+/**
+ * Accounting ownership: the per-case Budget built here owns the case's usage figures (reported in its
+ * SystemOutput); the optional shared runBudget owns run-wide limits and totals. generateStructured
+ * updates each exactly once per request, so neither double counts the other.
+ */
+function makeEnv(provider: LlmProvider, runBudget?: Budget) {
   const usage = { calls: 0, inputTokens: 0, outputTokens: 0 };
   const env: StageEnv = {
     provider,
     budget: new Budget(HIGH, { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null, estimated: false }),
     backoffMs: 500,
+    runBudget,
     onUsage: (_s, u) => {
       usage.calls++;
       usage.inputTokens += u.inputTokens;
@@ -49,6 +55,12 @@ function makeEnv(provider: LlmProvider) {
     onEvent: () => {},
   };
   return { env, usage, finish: () => ({ ...usage, costUsd: provider.info.kind === "fixture" ? null : costUsd(usage.inputTokens, usage.outputTokens) }) };
+}
+
+/** A run-wide budget refusal is not a model-quality failure: flag it so the runner can stop and report it separately. */
+export function recordError(out: SystemOutput, e: unknown): void {
+  out.error = (e as Error).message;
+  if (e instanceof BudgetExceededError && e.scope === "run") out.budgetExhausted = true;
 }
 
 const empty = (system: SystemOutput["system"]): SystemOutput => ({
@@ -113,23 +125,23 @@ function fillFromSinglePrompt(out: SystemOutput, res: SinglePromptOutput, snap: 
  * It measures pre-answer output quality only: neither system here gets human answers, so the
  * benefit of a completed clarification loop is not measured.
  */
-export async function runSinglePrompt(c: EvalCase, provider: LlmProvider): Promise<SystemOutput> {
+export async function runSinglePrompt(c: EvalCase, provider: LlmProvider, runBudget?: Budget): Promise<SystemOutput> {
   const t0 = performance.now();
   const snap = snapshotFor(c.repo);
   const out = empty("single_prompt");
-  const { env, finish } = makeEnv(provider);
+  const { env, finish } = makeEnv(provider, runBudget);
   try {
     const evidence = investigate(snap, c.ticket).evidence;
     out.contextFiles = [...new Set(evidence.map((e) => e.path))];
     out.context = { kind: "same_evidence", filesInPrompt: out.contextFiles.length, filesInRepo: snap.files.size, truncated: false, excerptsInPrompt: evidence.length };
     const ctx: SinglePromptEvidenceContext = { ticket: c.ticket, evidence };
     const res = await generateStructured({
-      provider, budget: env.budget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptEvidencePrompt(ctx), schema: SinglePromptOutput,
-      schemaName: "SinglePromptOutput", maxOutputTokens: 6000, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
+      provider, budget: env.budget, runBudget: env.runBudget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptEvidencePrompt(ctx), schema: SinglePromptOutput,
+      schemaName: "SinglePromptOutput", maxOutputTokens: STAGE_MAX_OUTPUT.single_prompt, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
     });
     fillFromSinglePrompt(out, res, snap);
   } catch (e) {
-    out.error = (e as Error).message;
+    recordError(out, e);
   }
   out.latencyMs = performance.now() - t0;
   out.usage = { ...finish(), exact: !out.error };
@@ -141,11 +153,11 @@ export async function runSinglePrompt(c: EvalCase, provider: LlmProvider): Promi
  * character budget the retriever gets: no retrieval. Confounds retrieval quality with the benefit
  * of staging, so it is not the main comparison. Run with --systems single_alphabetical.
  */
-export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProvider, budgetChars = DEFAULT_RETRIEVAL.maxChars): Promise<SystemOutput> {
+export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProvider, budgetChars = DEFAULT_RETRIEVAL.maxChars, runBudget?: Budget): Promise<SystemOutput> {
   const t0 = performance.now();
   const snap = snapshotFor(c.repo);
   const out = empty("single_prompt_alphabetical");
-  const { env, finish } = makeEnv(provider);
+  const { env, finish } = makeEnv(provider, runBudget);
   try {
     const files: { path: string; content: string; truncated: boolean }[] = [];
     let used = 0;
@@ -160,12 +172,12 @@ export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProv
     out.context = { kind: "alphabetical", filesInPrompt: files.length, filesInRepo: snap.files.size, truncated: files.length < snap.files.size || files.some((f) => f.truncated) };
     const ctx = { ticket: c.ticket, files };
     const res = await generateStructured({
-      provider, budget: env.budget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptPrompt(ctx), schema: SinglePromptOutput,
-      schemaName: "SinglePromptOutput", maxOutputTokens: 6000, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
+      provider, budget: env.budget, runBudget: env.runBudget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptPrompt(ctx), schema: SinglePromptOutput,
+      schemaName: "SinglePromptOutput", maxOutputTokens: STAGE_MAX_OUTPUT.single_prompt, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
     });
     fillFromSinglePrompt(out, res, snap);
   } catch (e) {
-    out.error = (e as Error).message;
+    recordError(out, e);
   }
   out.latencyMs = performance.now() - t0;
   out.usage = { ...finish(), exact: !out.error };
@@ -178,11 +190,11 @@ export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProv
  * The product pipeline without a human: investigate -> analyze -> clarify (round 1) -> brief with
  * every question deferred (so nothing is silently decided) -> verify.
  */
-export async function runStaged(c: EvalCase, provider: LlmProvider): Promise<SystemOutput> {
+export async function runStaged(c: EvalCase, provider: LlmProvider, runBudget?: Budget): Promise<SystemOutput> {
   const t0 = performance.now();
   const snap = snapshotFor(c.repo);
   const out = empty("staged");
-  const { env, finish } = makeEnv(provider);
+  const { env, finish } = makeEnv(provider, runBudget);
   try {
     const inv = investigate(snap, c.ticket);
     const evidence = inv.evidence;
@@ -211,7 +223,7 @@ export async function runStaged(c: EvalCase, provider: LlmProvider): Promise<Sys
     out.insufficientEvidence = analysis.insufficientEvidence;
     out.verification = { errors: report.issues.filter((i) => i.severity === "error").length, warnings: report.issues.filter((i) => i.severity === "warning").length };
   } catch (e) {
-    out.error = (e as Error).message;
+    recordError(out, e);
   }
   out.latencyMs = performance.now() - t0;
   out.usage = { ...finish(), exact: !out.error };

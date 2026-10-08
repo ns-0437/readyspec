@@ -39,6 +39,8 @@ export interface SystemOutput {
   usage: { calls: number; inputTokens: number; outputTokens: number; costUsd: number | null; exact?: boolean };
   context?: { kind: "same_evidence" | "alphabetical"; filesInPrompt: number; filesInRepo: number; truncated: boolean; excerptsInPrompt?: number };
   error?: string;
+  /** The evaluation-wide budget refused a request. Not a model-quality failure; the output is incomplete. */
+  budgetExhausted?: boolean;
 }
 
 /* ------------------------------ keyword matching ------------------------------ */

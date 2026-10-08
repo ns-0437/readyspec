@@ -16,7 +16,9 @@ export interface SavedResult {
   provider: { kind: string; label: string; model: string | null };
   savedAt: string;
   output: SystemOutput;
-  score: CaseScore;
+  /** "completed": scored like any result (including model failures). "budget_exhausted": the run-wide budget stopped this case mid-way; its output is partial and it is NOT scored or aggregated. */
+  status?: "completed" | "budget_exhausted";
+  score: CaseScore | null;
 }
 
 /** Write via a temp file and rename, so a crash never leaves a half-written file under the final name. */

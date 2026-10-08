@@ -162,6 +162,6 @@ describe("pilot plan (dry run)", () => {
     expect(text).toContain("DRY RUN: no provider calls were made");
     expect(text).toContain("depends on earlier model output");
     expect(text).toContain("NOT SET");
-    expect(text).toContain("none of this guarantees the provider's final bill");
+    expect(text).toContain("nothing here guarantees the provider's final bill");
   });
 });

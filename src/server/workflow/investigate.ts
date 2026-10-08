@@ -1,6 +1,6 @@
 import type { Disclosure, EvidenceItem, InspectionResult } from "@/shared/schemas";
 import { inspectSnapshot } from "@/server/repository/inspect";
-import { queryTerms, retrieveEvidence, type RetrievalResult } from "@/server/repository/search";
+import { queryTerms, retrieveEvidence, type RetrievalOptions, type RetrievalResult } from "@/server/repository/search";
 import type { Snapshot } from "@/server/repository/types";
 import { estimateTokens, type LlmProvider } from "@/server/llm/provider";
 import { SYSTEM_PROMPT } from "@/server/llm/prompts";
@@ -12,9 +12,10 @@ export interface Investigation {
 }
 
 /** Stages 1 and 2: pure functions of the snapshot and ticket. No model, no network. */
-export function investigate(snapshot: Snapshot, ticket: string): Investigation {
+/** `retrieval` overrides the default budget; callers that compare systems must pass the same value to each. */
+export function investigate(snapshot: Snapshot, ticket: string, retrievalOptions?: Partial<RetrievalOptions>): Investigation {
   const inspection = inspectSnapshot(snapshot);
-  const retrieval = retrieveEvidence(snapshot, ticket);
+  const retrieval = retrieveEvidence(snapshot, ticket, retrievalOptions);
   return { inspection, retrieval, evidence: retrieval.evidence };
 }
 

@@ -60,6 +60,12 @@ saves the interrupted case unscored and lists the rest as not run (`run-accounti
 model failures. `--pilot --dry-run` plans the five-case same-evidence-vs-staged pilot with zero provider
 calls. No live pilot has been run and no spending limit is authorized yet.
 
+**Compact profile (2026-10-08):** `--profile compact` (output allowances 1500/1000/2500, single prompt 2500;
+unvalidated hypotheses) and `--evidence-max-chars` (one retrieval cap for both systems) make requests fit
+small provider allowances; `--dry-run` shows fit, margin, excluded excerpts and the budget needed. For
+demo-01 against an 8000-token allowance, three of four requests fit with full evidence; the brief does
+not. A single-case run is a feasibility check, not a benchmark. No live call made.
+
 ## Purpose, user, scope
 
 - **User:** an engineer or tech lead preparing a ticket for implementation.

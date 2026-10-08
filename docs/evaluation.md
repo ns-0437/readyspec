@@ -97,6 +97,8 @@ npm run eval -- --pilot --dry-run --provider groq --provider-token-limit 8000
 npm run eval -- --pilot --provider groq --max-calls <N> --max-input-tokens <N> --max-output-tokens <N>
 ```
 
+Profiles: `--profile default|compact` sets per-stage output allowances (default 6000/4000/10000 and single prompt 6000, unchanged; compact 1500/1000/2500 and single prompt 2500, **initial hypotheses, not validated quality settings**). `--output-allowance stage=N,...` overrides single stages, and `--evidence-max-chars N` applies one retrieval budget to BOTH systems so they still receive identical excerpts. With both systems selected the single-prompt allowance must equal the brief allowance. `--dry-run` also reports system/schema overhead, the `--safety-margin` (default 10% on every input estimate; chars/4 is a heuristic, not tokenization), reserved output, retry exposure, the run-wide budget the plan needs, which stages fit `--provider-token-limit N`, and exactly which excerpts a shared evidence cap excludes (and whether the case's required files survive). A run on one case is labelled a feasibility check, not a quality benchmark.
+
 Accounting: token and cost totals include failed outputs' known usage. A failed request's own usage is
 unavailable and never invented, so such totals are a known lower bound and cost prints as
 "$X known + unknown usage (...)" unless every output has a cost figure. A known zero (the static checklist,

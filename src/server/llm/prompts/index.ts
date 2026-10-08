@@ -60,6 +60,14 @@ Repository summary: ${ctx.inspection.fileCount} readable files; languages: ${ctx
 ${renderEvidence(ctx.evidence)}`;
 }
 
+/**
+ * The analysis as later stages need it. evidenceNotes (id -> why it matters) is display metadata the
+ * service attaches to evidence itself and the clarify/brief models never use, so it is not resent.
+ */
+function analysisForPrompt(analysis: ClarifyContext["analysis"]): string {
+  return JSON.stringify({ ...analysis, evidenceNotes: undefined });
+}
+
 export function clarifyPrompt(ctx: ClarifyContext): string {
   const answered = ctx.decisions.length
     ? ctx.decisions.map((d) => `- [${d.questionId}] ${d.question} => ${d.source === "deferred" ? "(deferred by user)" : d.answer}`).join("\n")
@@ -77,7 +85,7 @@ ${fence(ctx.ticket)}
 </ticket>
 
 <analysis>
-${fence(JSON.stringify(ctx.analysis))}
+${fence(analysisForPrompt(ctx.analysis))}
 </analysis>
 
 <decisions>
@@ -111,7 +119,7 @@ ${fence(ctx.ticket)}
 </ticket>
 
 <analysis>
-${fence(JSON.stringify(ctx.analysis))}
+${fence(analysisForPrompt(ctx.analysis))}
 </analysis>
 
 <decisions>

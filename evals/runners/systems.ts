@@ -9,9 +9,11 @@ import { DEFAULT_RETRIEVAL } from "@/server/repository/search";
 import { createSnapshot } from "@/server/repository/snapshot";
 import type { Snapshot } from "@/server/repository/types";
 import { investigate } from "@/server/workflow/investigate";
-import { runAnalyze, runBrief, runClarify, STAGE_MAX_OUTPUT, type StageEnv } from "@/server/workflow/stages";
+import { runAnalyze, runBrief, runClarify, STAGE_MAX_OUTPUT, type StageEnv, type StageOutputAllowances } from "@/server/workflow/stages";
 import { verifyBrief } from "@/server/workflow/verify";
 import { SinglePromptOutput, type Decision, type EvidenceItem } from "@/shared/schemas";
+import type { EvalProfile } from "./profile";
+import { retrievalFor } from "./profile";
 import type { EvalCase } from "./schema";
 import type { ObservationOut, SystemOutput } from "./score";
 
@@ -40,13 +42,14 @@ const HIGH = { maxCalls: 50, maxInputTokens: 2_000_000, maxOutputTokens: 500_000
  * SystemOutput); the optional shared runBudget owns run-wide limits and totals. generateStructured
  * updates each exactly once per request, so neither double counts the other.
  */
-function makeEnv(provider: LlmProvider, runBudget?: Budget) {
+function makeEnv(provider: LlmProvider, runBudget?: Budget, outputs?: StageOutputAllowances) {
   const usage = { calls: 0, inputTokens: 0, outputTokens: 0 };
   const env: StageEnv = {
     provider,
     budget: new Budget(HIGH, { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null, estimated: false }),
     backoffMs: 500,
     runBudget,
+    outputs,
     onUsage: (_s, u) => {
       usage.calls++;
       usage.inputTokens += u.inputTokens;
@@ -125,19 +128,19 @@ function fillFromSinglePrompt(out: SystemOutput, res: SinglePromptOutput, snap: 
  * It measures pre-answer output quality only: neither system here gets human answers, so the
  * benefit of a completed clarification loop is not measured.
  */
-export async function runSinglePrompt(c: EvalCase, provider: LlmProvider, runBudget?: Budget): Promise<SystemOutput> {
+export async function runSinglePrompt(c: EvalCase, provider: LlmProvider, runBudget?: Budget, profile?: EvalProfile): Promise<SystemOutput> {
   const t0 = performance.now();
   const snap = snapshotFor(c.repo);
   const out = empty("single_prompt");
   const { env, finish } = makeEnv(provider, runBudget);
   try {
-    const evidence = investigate(snap, c.ticket).evidence;
+    const evidence = investigate(snap, c.ticket, retrievalFor(profile)).evidence; // same call and budget as the staged system
     out.contextFiles = [...new Set(evidence.map((e) => e.path))];
     out.context = { kind: "same_evidence", filesInPrompt: out.contextFiles.length, filesInRepo: snap.files.size, truncated: false, excerptsInPrompt: evidence.length };
     const ctx: SinglePromptEvidenceContext = { ticket: c.ticket, evidence };
     const res = await generateStructured({
       provider, budget: env.budget, runBudget: env.runBudget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptEvidencePrompt(ctx), schema: SinglePromptOutput,
-      schemaName: "SinglePromptOutput", maxOutputTokens: STAGE_MAX_OUTPUT.single_prompt, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
+      schemaName: "SinglePromptOutput", maxOutputTokens: (profile?.outputs ?? STAGE_MAX_OUTPUT).single_prompt, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
     });
     fillFromSinglePrompt(out, res, snap);
   } catch (e) {
@@ -190,13 +193,13 @@ export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProv
  * The product pipeline without a human: investigate -> analyze -> clarify (round 1) -> brief with
  * every question deferred (so nothing is silently decided) -> verify.
  */
-export async function runStaged(c: EvalCase, provider: LlmProvider, runBudget?: Budget): Promise<SystemOutput> {
+export async function runStaged(c: EvalCase, provider: LlmProvider, runBudget?: Budget, profile?: EvalProfile): Promise<SystemOutput> {
   const t0 = performance.now();
   const snap = snapshotFor(c.repo);
   const out = empty("staged");
-  const { env, finish } = makeEnv(provider, runBudget);
+  const { env, finish } = makeEnv(provider, runBudget, profile?.outputs);
   try {
-    const inv = investigate(snap, c.ticket);
+    const inv = investigate(snap, c.ticket, retrievalFor(profile));
     const evidence = inv.evidence;
     out.contextFiles = [...new Set(evidence.map((e) => e.path))];
     const analysis = await runAnalyze(env, { ticket: c.ticket, evidence, inspection: inv.inspection });

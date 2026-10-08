@@ -23,7 +23,8 @@ import type { EvalCase } from "./schema";
 import { renderReport, renderVariance } from "./report";
 import { aggregate, scoreRun, type Aggregate, type CaseScore, type SystemName, type SystemOutput } from "./score";
 import { atomicWrite, createRunDir, humanSheet, saveResult, writeOnce } from "./store";
-import { PILOT_SYSTEMS, planPilot, renderPlan, selectPilotCases } from "./pilot";
+import { DEFAULT_SAFETY_MARGIN, PILOT_SYSTEMS, planPilot, renderPlan, selectPilotCases } from "./pilot";
+import { profileProblems, resolveProfile, type EvalProfile } from "./profile";
 import { runChecklist, runSinglePrompt, runSinglePromptAlphabetical, runStaged } from "./systems";
 
 const RESULTS_DIR = path.resolve(__dirname, "..", "results");
@@ -44,19 +45,23 @@ export interface RunOptions {
   runLimits?: SessionLimits;
   /** Prices for the run budget's dollar estimate; defaults to the environment. */
   prices?: Prices | null;
+  /** Output allowances and shared evidence budget; default profile when unset. Recorded in run.json. */
+  profile?: EvalProfile;
+  /** Free-text label recorded in run.json and the report (e.g. that a run is a feasibility check). */
+  note?: string;
   /** Test seam: defaults to the real systems. */
   execute?: (system: SystemName, c: EvalCase, provider: LlmProvider, runBudget?: Budget) => Promise<SystemOutput>;
   argv?: string[];
 }
 
-const realExecute = (system: SystemName, c: EvalCase, provider: LlmProvider, runBudget?: Budget): Promise<SystemOutput> =>
+const realExecute = (system: SystemName, c: EvalCase, provider: LlmProvider, runBudget?: Budget, profile?: EvalProfile): Promise<SystemOutput> =>
   system === "checklist"
     ? runChecklist()
     : system === "single_prompt"
-      ? runSinglePrompt(c, provider, runBudget)
+      ? runSinglePrompt(c, provider, runBudget, profile)
       : system === "single_prompt_alphabetical"
         ? runSinglePromptAlphabetical(c, provider, undefined, runBudget)
-        : runStaged(c, provider, runBudget);
+        : runStaged(c, provider, runBudget, profile);
 
 const NO_USAGE: Usage = { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null, estimated: false };
 
@@ -68,12 +73,12 @@ export interface PlannedItem {
 
 export async function runBenchmark(o: RunOptions): Promise<{ runDir: string; aggsByRun: Aggregate[][]; overall: Aggregate[]; report: string; budgetExhausted: boolean; notRun: PlannedItem[] }> {
   const { provider, set, cases, systems, repeat } = o;
-  const execute = o.execute ?? realExecute;
+  const execute = o.execute ?? ((s: SystemName, c: EvalCase, p: LlmProvider, b?: Budget) => realExecute(s, c, p, b, o.profile));
   const live = provider.info.kind !== "fixture";
   // Built before anything is written: an unusable limit configuration must not leave a half-made run.
   const runBudget = o.runLimits ? new Budget(o.runLimits, NO_USAGE, o.prices === undefined ? getPrices() : o.prices, "run") : undefined;
   const runDir = createRunDir(path.join(o.resultsDir, "runs"), `${provider.info.kind}-${set}`);
-  const meta = { provider: provider.info, set, systems, repeat, cases: cases.map((c) => c.id), runLimits: o.runLimits ?? null, argv: o.argv ?? [], startedAt: new Date().toISOString() };
+  const meta = { provider: provider.info, set, systems, repeat, cases: cases.map((c) => c.id), runLimits: o.runLimits ?? null, profile: o.profile ?? null, note: o.note ?? null, argv: o.argv ?? [], startedAt: new Date().toISOString() };
   const writeMeta = (status: string, extra: Record<string, unknown> = {}) => atomicWrite(path.join(runDir, "run.json"), JSON.stringify({ ...meta, status, updatedAt: new Date().toISOString(), ...extra }, null, 2));
   writeMeta("in_progress");
   if (live) writeOnce(path.join(runDir, "scoring-sheet.csv"), humanSheet(cases, systems, repeat));
@@ -142,6 +147,9 @@ export async function runBenchmark(o: RunOptions): Promise<{ runDir: string; agg
     renderReport({ provider, set, aggs: overall, scores: allScores, outputs: allOutputs, cases }) +
     `\n## Run\n\nOverall tables above pool all ${repeat} repetition(s) (${allScores.length} saved scored results). Per-repetition aggregates are in summary.json; raw results are in ${path.relative(o.resultsDir, runDir).split(path.sep).join("/")}/results.\n` +
     budgetNote +
+    (o.note ? `
+${o.note}
+` : "") +
     (repeat > 1 ? renderVariance(aggsByRun, !live) : "");
   atomicWrite(path.join(runDir, "summary.json"), JSON.stringify({ provider: provider.info, set, repeat, perRepetition: aggsByRun, overall, budget: accounting }, null, 2));
   atomicWrite(path.join(runDir, "report.md"), report);
@@ -203,20 +211,27 @@ async function main() {
     if (set !== "dev") console.warn("NOTE: held-out cases should be run once, after the code is frozen. Do not tune against them.");
   }
   const repeat = Math.max(1, Number(arg("repeat", "1")) || 1);
+  const profile = resolveProfile(argValue("profile"), { outputs: argValue("output-allowance"), evidenceMaxChars: argValue("evidence-max-chars") });
+  const marginRaw = argValue("safety-margin");
+  const safetyMargin = marginRaw === undefined ? DEFAULT_SAFETY_MARGIN : Number(marginRaw);
+  if (!Number.isFinite(safetyMargin) || safetyMargin < 0 || safetyMargin > 1) throw new Error(`--safety-margin must be between 0 and 1, got "${marginRaw}"`);
+  const problems = profileProblems(profile, systems);
+  const note = cases.length === 1 ? "Feasibility check for one development case. It shows whether the requests run and fit; it is not a quality benchmark." : undefined;
 
   if (dryRun) {
     const limit = Number(argValue("provider-token-limit")) || undefined;
     const runLimits = parseRunLimits(argValue, false);
-    const plan = planPilot({ cases: roles, systems, prices: getPrices(), providerTokenLimit: limit });
-    console.log(renderPlan(plan, { providerLabel: provider.info.label, systems, providerTokenLimit: limit, runLimitsSet: runLimits !== undefined }));
+    const plan = planPilot({ cases: roles, systems, prices: getPrices(), providerTokenLimit: limit, profile, safetyMargin });
+    console.log(renderPlan(plan, { providerLabel: provider.info.label, systems, providerTokenLimit: limit, runLimitsSet: runLimits !== undefined, problems }));
     if (repeat > 1) console.log(`\nNote: the figures above are for ONE repetition; this command asks for ${repeat}.`);
     return; // no provider call, no run directory
   }
 
+  if (problems.length) throw new Error(`Configuration problem: ${problems.join("; ")}`);
   const runLimits = parseRunLimits(argValue, live);
   console.log(`Running ${cases.length} case(s) x [${systems.join(", ")}] with ${provider.info.label}${runLimits ? `; run-wide limits ${JSON.stringify(runLimits)}` : ""}`);
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
-  const { runDir, report } = await runBenchmark({ provider, set, cases, systems, repeat, resultsDir: RESULTS_DIR, runLimits, argv: process.argv.slice(2) });
+  const { runDir, report } = await runBenchmark({ provider, set, cases, systems, repeat, resultsDir: RESULTS_DIR, runLimits, profile, note, argv: process.argv.slice(2) });
   console.log(report);
   console.log(`Run saved in ${runDir}`);
 }

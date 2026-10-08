@@ -68,6 +68,11 @@ not. A single-case run is a feasibility check, not a benchmark. No live call mad
 
 ## Purpose, user, scope
 
+**README presentation (2026-10-08):** README now includes a repository-local SVG banner, expandable
+walkthrough/configuration/code-map sections, Mermaid workflow, and an explicit measured-vs-unproven
+table. `docs/assets/readyspec-hero.svg` is hand-authored vector artwork; the walkthrough is labelled
+illustrative, not a live-model result.
+
 **Publishing checks (2026-10-08):** all 246 tests pass locally. CI's key-free benchmark now explicitly
 selects checklist + staged, because fixture runs measure retrieval/checklist mechanics and the
 production output allowances intentionally differ between single-prompt and staged briefs.

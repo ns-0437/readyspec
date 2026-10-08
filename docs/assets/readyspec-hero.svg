@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="370" viewBox="0 0 1200 370" role="img" aria-labelledby="title desc">
+  <title id="title">ReadySpec</title>
+  <desc id="desc">Rough ticket. Clear decisions. A plan backed by your code. Find the code, resolve missing decisions, and connect implementation to evidence.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101b30"/><stop offset="1" stop-color="#12343c"/></linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#92b8cd" stroke-opacity=".055"/></pattern>
+  </defs>
+  <rect width="1200" height="370" rx="22" fill="url(#bg)"/>
+  <rect width="1200" height="370" rx="22" fill="url(#grid)"/>
+  <g font-family="Segoe UI,Arial,sans-serif">
+    <text x="60" y="66" fill="#5eead4" font-size="13" letter-spacing="3">REPOSITORY-AWARE ENGINEERING</text>
+    <text x="57" y="153" fill="#f8fafc" font-size="76" font-weight="700" letter-spacing="-3">ReadySpec</text>
+    <text x="60" y="204" fill="#e2e8f0" font-size="25">Rough ticket. Clear decisions.</text>
+    <text x="60" y="240" fill="#a6bbcf" font-size="25">A plan backed by your code.</text>
+    <rect x="60" y="287" width="492" height="34" rx="17" fill="#5eead4" fill-opacity=".08" stroke="#5eead4" stroke-opacity=".2"/>
+    <text x="306" y="309" text-anchor="middle" fill="#9ce8dd" font-size="12" letter-spacing="2">READ-ONLY  /  TRACEABLE  /  HUMAN-REVIEWED</text>
+    <rect x="670" y="62" width="464" height="248" rx="16" fill="#0c1829" stroke="#33505e"/>
+    <path d="M706 119V252" stroke="#345363" stroke-width="2"/>
+    <g fill="#163c43" stroke="#5eead4" stroke-opacity=".5"><circle cx="706" cy="117" r="15"/><circle cx="706" cy="184" r="15"/><circle cx="706" cy="251" r="15"/></g>
+    <g fill="#5eead4" text-anchor="middle" font-size="12" font-weight="700"><text x="706" y="121">01</text><text x="706" y="188">02</text><text x="706" y="255">03</text></g>
+    <g fill="#f1f5f9" font-size="18" font-weight="600"><text x="738" y="114">Find the code that matters</text><text x="738" y="181">Resolve missing decisions</text><text x="738" y="248">Connect the implementation</text></g>
+    <g fill="#94a9bf" font-size="13"><text x="738" y="136">Snapshot + retrieval + cited excerpts</text><text x="738" y="203">Focused questions. Human answers.</text><text x="738" y="270">Criteria → components → tests</text></g>
+  </g>
+</svg>

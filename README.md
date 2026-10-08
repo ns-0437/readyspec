@@ -1,227 +1,226 @@
-# ReadySpec
+<div align="center">
+
+![ReadySpec — rough ticket, clear decisions, a plan backed by your code](docs/assets/readyspec-hero.svg)
+
+**Turn an ambiguous ticket into an implementation brief you can inspect.**
 
 [![CI](https://github.com/ns-0437/readyspec/actions/workflows/ci.yml/badge.svg)](https://github.com/ns-0437/readyspec/actions/workflows/ci.yml)
-![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933)
+[![Retrieval regression](https://github.com/ns-0437/readyspec/actions/workflows/retrieval-regression.yml/badge.svg)](https://github.com/ns-0437/readyspec/actions/workflows/retrieval-regression.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![Node](https://img.shields.io/badge/Node-%E2%89%A522.13-339933)
 
-**A repository-aware agent that turns a rough engineering ticket into an evidence-backed
-implementation brief.** It reads the actual code, finds the decisions the ticket leaves open, asks
-a few useful questions, and produces a plan an engineer can review and implement. Every statement
-about existing behavior points at code; every proposed change connects to a requirement and a test.
+[Try locally](#try-locally) · [Explore an example](#from-ticket-to-brief) · [Under the hood](#under-the-hood) · [What-is-measured](#what-is-measured)
 
-> *"I built a repository-aware agent that helps engineers resolve ambiguity before implementation,
-> with code-backed evidence and a benchmark against simpler approaches."*
+</div>
 
-> **Demonstration data.** The repositories under `fixtures/` are fictional code written for this
-> project. They are not BetterMe's code or system.
+ReadySpec reads a repository, finds the decisions a ticket leaves open, asks focused questions,
+and builds a brief with code citations. Select an acceptance criterion in the app to trace it
+to evidence, components, tests, and the decisions behind it.
 
-**Contents:** [Status](#status) · [The problem](#the-problem) · [How it works](#how-it-works) ·
-[Quick start](#quick-start) · [Configuration](#configuration) · [Safety model](#safety-model) ·
-[Evaluation](#evaluation) · [Project layout](#project-layout) · [Development](#development) ·
-[Roadmap](#roadmap) · [Limitations](#limitations)
+> **Project status:** the end-to-end workflow is built. The default demo is a clearly labelled,
+> scripted fixture provider and needs no API key. **Whether staged generation produces better
+> briefs than a single prompt is still unproven.** [Validation record →](docs/live-validation.md)
 
-## Status
+## From ticket to brief
 
-| Works and is tested | Not done / not validated |
-|---|---|
-| Full flow: select repo, investigate, consent, clarify, brief, verify, edit, approve, export | **Anthropic has never run against a real API** (no key). Only tested against a local mock server. |
-| **Gemini validated live** (`gemini-3.6-flash`): full staged pipeline completed end to end via `npm run smoke:live` and separately through the real browser UI — see [docs/decisions.md](docs/decisions.md) item 14 for the three real schema bugs that surfaced and were fixed from live errors, not guesses | Gemini's own free-tier quota is exhausted, so no full run has completed twice |
-| **Groq live-tested** (`openai/gpt-oss-120b`, free tier): auth, schema handling and error classification all confirmed against the real API — see [docs/decisions.md](docs/decisions.md) item 21 | This account's Groq free tier caps at 8000 tokens/minute account-wide, which a single `analyze` call can already exceed — no benchmark run has completed on it yet either |
-| Deterministic verifier: citations, support, traceability, decisions | Support check is lexical, not semantic |
-| 200 tests, lint, typecheck, production build, CI | Retrieval is lexical; precision is 36-59% (36% on the one repo bigger than the retrieval budget) |
-| Deterministic retrieval and static-checklist benchmark results | **No model-quality benchmark result exists yet** for any provider (needs dozens of calls; every provider tried so far hit a real free-tier or availability limit) |
+> “Let users pause notifications while they are away.”
 
-Without a key the app runs the **fixture provider**: scripted output for the demonstration ticket,
-mechanical elsewhere. It is labelled in the UI, in the brief, in exports and in evaluation reports.
-It is not a language model. Next steps: [docs/roadmap.md](docs/roadmap.md).
+| Before implementation | What ReadySpec puts in front of the engineer |
+| :--- | :--- |
+| **What does the code already do?** | Observed behavior linked to excerpts from an immutable repository snapshot. |
+| **Which decisions are missing?** | Up to five questions per round, with the reason each matters. |
+| **What exactly should change?** | Scope, acceptance criteria, affected components, implementation steps, and proposed tests. |
+| **Can I inspect and challenge it?** | A trace inspector, editable brief, visible open questions, and human approval before export. |
 
-## The problem
+<details>
+<summary><b>▸ Open the notification-pause walkthrough</b></summary>
 
-A ticket describes the outcome someone wants. It rarely says how the code behaves today, which
-components are involved, which product decisions are still open, or how the change will be tested.
-The engineer rediscovers all of that, then guesses at the gaps or interrupts someone.
+This is an illustrative walkthrough using the fictional demo repository, not a captured model
+result or any company's internal code.
 
-ReadySpec produces, for a given ticket and repository:
+1. **Find existing behavior.** `decideDelivery()` allows security notifications before checking
+   category preferences. [Read the source](fixtures/demo-repository/src/notifications/dispatcher.ts#L13-L17).
+2. **Expose the decision.** Should a pause also suppress security notifications? The ticket does
+   not say; ReadySpec should ask rather than silently choose.
+3. **Record the human answer.** For this example: “Keep security notifications eligible for
+   delivery during a pause.” This becomes a decision, not a model-invented fact.
+4. **Propose a criterion.** While a pause is active, ordinary notifications are skipped;
+   security notifications retain their existing delivery eligibility.
+5. **Connect a test.** Add pause-boundary and security-exception cases alongside the existing
+   [dispatcher tests](fixtures/demo-repository/tests/dispatcher.test.ts), then inspect the links
+   from the criterion to the component, evidence, and test proposal.
 
-- the requested outcome, scope and explicit non-goals
-- **existing behavior**, each statement tied to file and line evidence
-- the decisions a human made, and the questions still open
-- proposed acceptance criteria, each linked to evidence, affected components and a test
-- an implementation sequence, test plan, risks and explicit assumptions
+**Export:** Markdown for a design discussion, JSON for structured handoff, or a GitHub-issue
+checklist. These are downloadable outputs; ReadySpec does not post issues for you.
 
-Content is always one of four kinds, in the schema, the verifier, the UI and the exports:
+The links above navigate this repository. In the app, evidence additionally carries a line range
+and SHA-256 hash tied to the session's snapshot.
 
-| Kind | Meaning | Rule |
-|---|---|---|
-| **Observed** | What the code does today | Must cite evidence; verified against the pinned snapshot |
-| **Proposed** | A change, criterion, step or test | Never phrased as existing behavior |
-| **Assumed** | An explicit, temporary assumption | Says what would replace it |
-| **Unresolved** | A decision that needs a human | Never chosen silently; stays visible |
+</details>
 
-## How it works
+## Try locally
 
-```mermaid
-flowchart TD
-  A[Select repository + ticket] --> B[1 Inspect: read-only snapshot]
-  B --> C[2 Retrieve: BM25 + symbol hops -> bounded excerpts]
-  C --> D{Disclosure: exactly what would be sent. Consent?}
-  D -->|yes| E[3 Analyze behavior: observations, contradictions, open decisions]
-  E --> F[4 Clarify: at most 5 ranked questions per round]
-  F --> G[Human answers, suggests, or defers]
-  G --> H[5 Brief: criteria, components, steps, tests, risks]
-  H --> I[6 Verify: citations, support, traceability, decisions]
-  I --> J[Human review: edit, re-verify, approve, export]
-  G -.->|optional follow-up round| F
-```
-
-Stages 1, 2 and 6 are plain code; only 3, 4 and 5 (and an optional support judge) call a model. Data
-between stages is Zod-validated. Full design: [docs/architecture.md](docs/architecture.md).
-
-**The signature interaction:** select an acceptance criterion and the evidence explorer shows,
-together, the code excerpts it builds on (the rest dim), the affected components, its proposed
-tests, the steps that deliver it, the decisions it relies on and any open question blocking it.
-
-## Quick start
-
-Requires Node 22.13+ (it uses the built-in `node:sqlite`).
+Requires **Node.js 22.13 or later** and npm.
 
 ```bash
 git clone https://github.com/ns-0437/readyspec.git
 cd readyspec
-npm install
+npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. The demonstration repository and ticket ("Let users pause
-notifications while they are away.") are pre-filled. Click **Investigate repository**, review the
-disclosure and consent, answer the questions, then open the brief and click an acceptance criterion.
-A 90-second walkthrough is in [docs/demo.md](docs/demo.md).
+Open **http://localhost:3000**. Select the bundled demo repository, enter the notification-pause
+ticket above, investigate, review the excerpts, then continue through questions and the brief.
+With no provider keys configured, everything uses the scripted fixture provider.
 
-### Use a real model
+<details>
+<summary><b>▸ Already have API keys configured? Force a key-free demo</b></summary>
 
-Set a key for **any one** provider — Anthropic, Gemini and Groq are all supported behind the same
-adapter interface (`LlmProvider`); if more than one key is set, priority is Anthropic > Gemini >
-Groq unless `READYSPEC_PROVIDER` says otherwise. Groq's free tier needs no card:
-[console.groq.com/keys](https://console.groq.com/keys).
+PowerShell:
+
+```powershell
+$env:READYSPEC_PROVIDER = "fixture"
+npm run dev
+```
+
+macOS / Linux:
 
 ```bash
-export ANTHROPIC_API_KEY=...   # or: export GEMINI_API_KEY=... (GOOGLE_API_KEY also works) or export GROQ_API_KEY=...
-npm run smoke:live             # first-contact check; see docs/live-validation.md
-npm run dev
+READYSPEC_PROVIDER=fixture npm run dev
 ```
 
-(PowerShell: `$env:ANTHROPIC_API_KEY = "..."` / `$env:GEMINI_API_KEY = "..."` / `$env:GROQ_API_KEY = "..."`)
+</details>
 
-The key stays server-side. When a real model is used, the excerpts listed on the consent screen
-(and your ticket) are sent to that provider; nothing else from the repository is.
+<details>
+<summary><b>▸ Connect a real model or your own repository</b></summary>
 
-### Analyse your own repository
+Copy [`.env.example`](.env.example) to `.env.local`. Set `READYSPEC_PROVIDER` to `anthropic`,
+`gemini`, or `groq`, and add the corresponding API key. `READYSPEC_MODEL` overrides the model;
+choose a model available to your account. Restart the server after configuration changes.
 
-Add its parent directory to `READYSPEC_ALLOWED_ROOTS`. ReadySpec only reads it: it never executes
-code, installs dependencies or writes to the repository.
+Add local repository directories to `READYSPEC_ALLOWED_ROOTS` (separate with `;` on Windows,
+`:` elsewhere). Bundled fixtures are always allowed. The application reads snapshots; it does
+not execute the inspected repository or edit its files.
 
-## Configuration
+Optional call, token, and dollar ceilings are documented in `.env.example`. A dollar ceiling
+requires both input and output prices. Token estimates and conservative failure reservations
+are guards, not a guarantee of the provider's final bill.
 
-Copy `.env.example` to `.env.local`. All optional.
+`npm run smoke:live` exercises the configured live provider and consumes its quota. Read the
+[live-validation instructions](docs/live-validation.md) and [evaluation guide](docs/evaluation.md)
+before running paid calls. Never commit `.env.local`.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | unset | Enables the Anthropic provider |
-| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | unset | Enables the Gemini provider |
-| `GROQ_API_KEY` | unset | Enables the Groq provider (free tier, no card) |
-| `READYSPEC_PROVIDER` | `anthropic` if that key is set, else `gemini`, else `groq`, else `fixture` | Force a specific provider |
-| `READYSPEC_MODEL` | `claude-sonnet-5` (Anthropic) / `gemini-3.6-flash` (Gemini) / `openai/gpt-oss-120b` (Groq) | Model id for whichever provider is selected |
-| `ANTHROPIC_BASE_URL` / `GEMINI_BASE_URL` / `GROQ_BASE_URL` | provider default | Override the API host (testing only) |
-| `READYSPEC_MAX_CALLS` | 14 | Model calls per session (retries count) |
-| `READYSPEC_MAX_INPUT_TOKENS` / `READYSPEC_MAX_OUTPUT_TOKENS` | 200000 / 60000 | Per-session token ceilings |
-| `READYSPEC_MAX_COST_USD` | unset | Dollar ceiling. Requires both `READYSPEC_PRICE_*` set explicitly (0 allowed), otherwise rejected. Each request is checked against estimated worst-case cost before dispatch; estimates are heuristic, so it is a guard, not an exact billing limit |
-| `READYSPEC_PRICE_IN_PER_MTOK` / `READYSPEC_PRICE_OUT_PER_MTOK` | unset | USD per million tokens. Nothing is hard-coded, so cost shows as unknown until you set them |
-| `READYSPEC_ALLOWED_ROOTS` | fixtures only | Extra repository roots (path-delimited) |
-| `READYSPEC_DB` | `data/readyspec.db` | SQLite file |
+</details>
 
-## Safety model
+## Under the hood
 
-- **Untrusted input.** Repository text and tickets are fenced as data in prompts, instruction-like
-  text is flagged in the UI, and the model has no tools (regardless of provider), so text cannot
-  trigger an action.
-- **Confined reads.** Allowed roots only; symlinks and junctions are never followed; secrets, binaries,
-  generated, minified and oversized files are excluded; secret-bearing content is discarded.
-- **Consent.** No model call happens before you have seen the exact excerpts and agreed.
-- **Bounded.** Per-session ceilings on calls, tokens and cost; bounded retries; every call cancellable;
-  failures keep evidence and answers and can resume.
-- **Secrets.** Credentials stay server-side and are redacted from logs and errors.
-- **Human in charge.** Recorded answers override the model; approval needs a named reviewer, passing
-  verification for the current revision, and acknowledgement of any open questions.
-
-## Evaluation
-
-Thirty hand-authored tickets over four small fictional repositories (TypeScript and Python) — one of them,
-`helpdesk-platform`, deliberately larger than the retrieval budget so a single prompt actually gets truncated —
-thirteen held out in two cohorts, compared across a static checklist, a single prompt and the staged workflow.
-
-| What was actually measured (deterministic) | Development (17) | — helpdesk-platform alone (4) | Held-out v2 (6, clean) |
-|---|---|---|---|
-| Staged retrieval: required-file recall | 97% | 100% | 100% |
-| Staged retrieval: precision | 52% | 36% | 48% |
-| Static checklist: critical ambiguities asked | 3% | 0% |
-
-The model-dependent comparison (evidence correctness, ambiguity detection, unnecessary questions,
-human correction effort, latency, cost) **has not been measured**, so no claim that ReadySpec beats a
-single prompt is made. Read [evals/REPORT.md](evals/REPORT.md) for the failures, and
-[docs/evaluation.md](docs/evaluation.md) for method and threats to validity. Human rubric:
-[evals/rubrics/human-rubric.md](evals/rubrics/human-rubric.md).
-
-## Project layout
-
+```mermaid
+flowchart LR
+    A[Ticket + repository] --> B[Read-only snapshot]
+    B --> C[Retrieve evidence]
+    C --> D{Review excerpts & consent}
+    D --> E[Analyze]
+    E --> F[Clarify with the human]
+    F --> G[Generate brief]
+    G --> H[Structural checks]
+    H --> I[Edit & approve]
+    I --> J[Export]
 ```
-src/shared        Zod schemas and pure helpers (trace, edit ops, redaction)
-src/server/
-  repository      snapshot, safe file access, symbols, search, evidence
-  llm             provider adapters (Anthropic, Gemini, fixture), prompts, budgets, structured generation
-  workflow        stages, verifier, session service, export
-  persistence     SQLite store
-src/app/api       thin route handlers
-src/components    UI
-fixtures/         demo-repository and two evaluation repositories (fictional)
-evals/            cases, rubric, runner, results, report
-scripts/          live-smoke.ts
-tests/            Vitest suites
-docs/             product, architecture, decisions, evaluation, live-validation, roadmap, demo, plan
-CLAUDE.md         guide for future coding sessions
+
+Retrieval uses **BM25, symbol hops, and test-file pairing**. It runs locally before any model
+call. Follow-up answers can retrieve additional excerpts; sending new excerpts requires fresh consent.
+
+| Layer | Implementation |
+| :--- | :--- |
+| Interface | Next.js App Router, React, TypeScript |
+| Contracts | Zod at stage, API, and persistence boundaries |
+| Evidence | Filtered snapshots, deterministic retrieval, file/line/hash citations |
+| Generation | Anthropic, Gemini, and Groq adapters behind one plain-fetch interface |
+| Persistence | Local SQLite with resumable sessions and usage accounting |
+| Evaluation | Same-evidence baseline, durable per-result artifacts, run-wide budgets |
+
+<details>
+<summary><b>▸ Explore the code map</b></summary>
+
+```text
+src/
+  app/                  Pages and thin API handlers
+  components/           Session UI, brief editor, trace inspector
+  shared/               Schemas and pure trace/edit/redaction helpers
+  server/
+    repository/         Safe reads, snapshots, search, evidence
+    llm/                Providers, prompts, structured output, budgets
+    workflow/           Stage orchestration, verification, export
+    persistence/        SQLite storage and migrations
+evals/                  Cases, baselines, scoring, pilot planning
+fixtures/               Fictional repositories for demos and evaluation
+tests/                  Contract, safety, workflow, and regression tests
+docs/                   Architecture, decisions, evaluation, demo script
 ```
+
+Start with [architecture](docs/architecture.md), the [engineering decisions](docs/decisions.md),
+or [CLAUDE.md](CLAUDE.md) for working rules and the detailed code map.
+
+</details>
+
+## Keep facts and proposals distinct
+
+| Content kind | Meaning |
+| :--- | :--- |
+| **Observed** | A claim about existing code; requires evidence. |
+| **Proposed** | A change, criterion, step, or test to implement. |
+| **Assumed** | An explicit temporary assumption that can be replaced. |
+| **Unresolved** | A decision still waiting for a human answer. |
+
+**A valid citation does not prove a claim is true.** Structural checks validate citations,
+identifier matches, and links between brief items. A sentence with the correct identifiers but
+the wrong meaning can still pass. Human review remains the correctness gate.
+
+Repository text is untrusted data. File exclusions and redaction reduce exposure but cannot
+guarantee that arbitrary source code contains no secrets. This is a local, single-user tool
+without authentication; its SQLite snapshots contain repository content.
+
+## What is measured
+
+| Question | Evidence today |
+| :--- | :--- |
+| Does retrieval find the expected files? | **97.1% recall / 52.5% precision** on 17 hand-authored development cases; **0.59 distractor files per case**. Small fixture set, not a production claim. |
+| Does the live pipeline run? | Gemini validated; Groq's structured call validated, with staged execution limited by the tested account's quota. Anthropic remains mock-server tested. |
+| Does staged generation beat a single prompt? | **Not measured with live models yet.** Both systems now receive the same retrieved evidence. |
+| Is verification semantic? | **No.** Citation validity and identifier matching are structural checks. |
+| Is cost accounting exact billing? | **No.** Reported usage is separated from conservative estimates for failed requests. |
+
+[Read the evaluation report](evals/REPORT.md) · [Inspect the human rubric](evals/rubrics/human-rubric.md)
+· [See the next experiment](docs/roadmap.md)
+
+Reproduce the retrieval check or inspect a pilot without model calls:
+
+```bash
+npm run eval:regression
+npm run eval -- --provider fixture --pilot --profile compact --dry-run
+```
+
+The compact profile uses smaller output allowances; its effect on quality is unvalidated.
+Held-out quality evaluation is reserved for a code freeze. See the
+[evaluation guide](docs/evaluation.md) for budgets, repetitions, saved results, and cohort rules.
 
 ## Development
 
 ```bash
-npm run dev            # development server
+npm run check           # lint, typecheck, unit/integration tests
+npm run test:fixtures   # the fictional repositories' own tests
+npm run eval:regression # deterministic retrieval check
 npm run build          # production build
-npm run lint           # eslint
-npm run typecheck      # tsc (app and fixtures)
-npm test               # Vitest
-npm run test:fixtures  # the fixture repositories' own tests (node --test)
-npm run check          # lint + typecheck + test
-npm run eval -- --provider fixture --set dev            # benchmark; add --repeat N for variance
-npm run eval:regression                                 # deterministic retrieval-only check vs. evals/baseline-retrieval.json
-npm run smoke:live                                      # needs ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY
 ```
 
-CI runs lint, typecheck, tests, fixture tests, the deterministic benchmark and the build on every push.
-A separate workflow checks for retrieval regressions weekly and on PRs that touch retrieval code
-(`.github/workflows/retrieval-regression.yml`); Dependabot proposes dependency updates weekly.
+**Current boundaries:** one repository per session, regex-based symbol extraction, synchronous
+snapshots capped at 1,500 files / 12 MB, and in-process background work. Local SQLite requires
+persistent storage. This application cannot run on GitHub Pages.
 
-## Roadmap
+<div align="center">
 
-1. Validate the live path and finish the benchmark ([docs/live-validation.md](docs/live-validation.md)).
-2. Fix what that exposes; improve retrieval precision and the vocabulary gap.
-3. A benchmark on repositories larger than the context budget.
-4. Polish: revision diffs, inline line highlighting.
+**Find the evidence. Resolve the ambiguity. Review the plan.**
 
-Details and reasoning: [docs/roadmap.md](docs/roadmap.md). Decisions and measured trade-offs:
-[docs/decisions.md](docs/decisions.md).
+[90-second demo script](docs/demo.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
 
-## Limitations
-
-Single-user local tool (no authentication); one job per session, in-process; snapshot creation is
-synchronous and capped at 1500 files / 12 MB; symbol extraction is regex-based; the `node:sqlite` module prints an experimental warning. Snapshots store the
-contents of every readable file in the local SQLite file (`data/`, git-ignored); deleting a session
-removes them unless another session pins the same snapshot.
+</div>

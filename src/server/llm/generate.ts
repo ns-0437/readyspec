@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { redactSecrets } from "@/shared/redact";
-import type { Budget } from "./budget";
-import { BudgetExceededError, CancelledError, estimateTokens, ProviderError, type LlmProvider, type StageName } from "./provider";
+import type { Budget, FailedAttempt } from "./budget";
+import { BudgetExceededError, CancelledError, estimateTokens, ProviderError, type LlmProvider, type LlmResponse, type StageName } from "./provider";
 
 export interface GenerateOptions<T> {
   provider: LlmProvider;
@@ -20,6 +20,17 @@ export interface GenerateOptions<T> {
   backoffMs?: number;
   onUsage?: (u: { inputTokens: number; outputTokens: number; costUsd: number | null; estimated: boolean }) => void;
   onEvent?: (level: "info" | "warn", message: string) => void;
+  /** A request was dispatched but returned no usable response; persist it so a resume cannot reset the budget. */
+  onFailedAttempt?: (f: FailedAttempt) => void;
+}
+
+/**
+ * An HTTP 4xx (other than 408 timeout) means the API rejected the request before generating, so no
+ * usage was incurred. Anything else (5xx, network error, timeout, cancellation mid-flight) may have
+ * been billed and stays reserved as uncertain.
+ */
+export function isChargeFree(e: unknown): boolean {
+  return e instanceof ProviderError && e.status !== null && e.status >= 400 && e.status < 500 && e.status !== 408;
 }
 
 export class StageError extends Error {
@@ -84,24 +95,34 @@ export async function generateStructured<T>(opts: GenerateOptions<T>): Promise<T
   const backoff = opts.backoffMs ?? 600;
   const jsonSchema = z.toJSONSchema(opts.schema, { io: "input", unrepresentable: "any" }) as Record<string, unknown>;
   delete jsonSchema.$schema;
+  const schemaTokens = estimateTokens(JSON.stringify(jsonSchema));
   let user = opts.user;
   let lastProblem = "unknown failure";
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (opts.signal?.aborted) throw new CancelledError();
-    opts.budget.precheck(estimateTokens(opts.system) + estimateTokens(user), opts.maxOutputTokens);
+    // Every attempt, including retries, is checked and counted just before dispatch. The schema is
+    // sent with each request, so it is part of the input estimate. A throw here was never dispatched.
+    const reservation = opts.budget.reserve(estimateTokens(opts.system) + estimateTokens(user) + schemaTokens, opts.maxOutputTokens);
     try {
-      const res = await opts.provider.complete({
-        stage: opts.stage,
-        system: opts.system,
-        user,
-        schemaName: opts.schemaName,
-        jsonSchema,
-        maxOutputTokens: opts.maxOutputTokens,
-        signal: opts.signal,
-        context: opts.context,
-      });
-      const cost = opts.budget.record(res.usage.inputTokens, res.usage.outputTokens);
+      let res: LlmResponse;
+      try {
+        res = await opts.provider.complete({
+          stage: opts.stage,
+          system: opts.system,
+          user,
+          schemaName: opts.schemaName,
+          jsonSchema,
+          maxOutputTokens: opts.maxOutputTokens,
+          signal: opts.signal,
+          context: opts.context,
+        });
+      } catch (e) {
+        opts.onFailedAttempt?.(opts.budget.fail(reservation, isChargeFree(e)));
+        throw e;
+      }
+      // Reported usage replaces the reservation, even if the content below fails validation.
+      const cost = opts.budget.settle(reservation, res.usage.inputTokens, res.usage.outputTokens);
       opts.onUsage?.({ ...res.usage, costUsd: cost, estimated: opts.provider.info.kind === "fixture" });
 
       let parsed: unknown;

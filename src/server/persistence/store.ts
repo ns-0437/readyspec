@@ -124,7 +124,7 @@ export class Store {
   }
 
   deleteSession(id: string): void {
-    for (const table of ["artifacts", "decisions", "activity", "usage"]) {
+    for (const table of ["artifacts", "decisions", "activity", "usage", "usage_failures"]) {
       this.db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(id);
     }
     this.db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
@@ -261,6 +261,13 @@ export class Store {
       .run(sessionId, now(), stage, u.inputTokens, u.outputTokens, u.costUsd, u.estimated ? 1 : 0);
   }
 
+  /** A dispatched request with no usable response. Persisted so a resumed session cannot start with a fresh budget. */
+  recordFailedAttempt(sessionId: string, stage: string, f: { charge: "none" | "uncertain"; reservedInputTokens: number; reservedOutputTokens: number; reservedCostUsd: number | null }): void {
+    this.db
+      .prepare("INSERT INTO usage_failures (session_id,at,stage,charge,reserved_input,reserved_output,reserved_cost_usd) VALUES (?,?,?,?,?,?,?)")
+      .run(sessionId, now(), stage, f.charge, f.reservedInputTokens, f.reservedOutputTokens, f.reservedCostUsd);
+  }
+
   getUsage(sessionId: string): Usage {
     const row = this.db
       .prepare(
@@ -268,7 +275,16 @@ export class Store {
                 SUM(cost_usd) AS c, COALESCE(MAX(estimated),0) AS e FROM usage WHERE session_id = ?`,
       )
       .get(sessionId) as { calls: number; i: number; o: number; c: number | null; e: number };
-    return Usage.parse({ calls: row.calls, inputTokens: row.i, outputTokens: row.o, costUsd: row.c, estimated: row.e === 1 });
+    const f = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN charge = 'uncertain' THEN 1 ELSE 0 END),0) AS u, COALESCE(SUM(reserved_input),0) AS i,
+                COALESCE(SUM(reserved_output),0) AS o, SUM(reserved_cost_usd) AS c FROM usage_failures WHERE session_id = ?`,
+      )
+      .get(sessionId) as { n: number; u: number; i: number; o: number; c: number | null };
+    return Usage.parse({
+      calls: row.calls, inputTokens: row.i, outputTokens: row.o, costUsd: row.c, estimated: row.e === 1,
+      failedAttempts: f.n, uncertainAttempts: f.u, uncertainInputTokens: f.i, uncertainOutputTokens: f.o, uncertainCostUsd: f.c,
+    });
   }
 }
 

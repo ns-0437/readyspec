@@ -356,6 +356,13 @@ export const Usage = z.object({
   outputTokens: z.number().int(),
   costUsd: z.number().nullable(),
   estimated: z.boolean(),
+  /** Dispatched requests that returned no usable response (they still count against the call ceiling). */
+  failedAttempts: z.number().int().optional(),
+  /** Subset of failedAttempts that may have been billed. Kept as conservative reservations, NOT reported usage. */
+  uncertainAttempts: z.number().int().optional(),
+  uncertainInputTokens: z.number().int().optional(),
+  uncertainOutputTokens: z.number().int().optional(),
+  uncertainCostUsd: z.number().nullable().optional(),
 });
 export type Usage = z.infer<typeof Usage>;
 

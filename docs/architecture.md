@@ -112,6 +112,10 @@ providers see only the rendered prompt.
 `sessions`, `snapshots` + `snapshot_files`, `artifacts` (kind, round -> validated JSON),
 `decisions`, `activity`, `usage`. Artifacts are Zod-parsed on read and write.
 
+## Budgets and request accounting
+
+`Budget` (`src/server/llm/budget.ts`) reserves each request just before `provider.complete()`: it prechecks calls, tokens and (with a dollar ceiling) estimated worst-case cost (input estimate incl. the serialized schema, plus maximum output), then counts the attempt. Rejected prechecks are not counted. A response with usage (even one that fails schema validation) replaces the reservation with reported usage; every retry is reserved and checked again. A dispatched request with no usable response still consumes a call; unless the API rejected it outright (HTTP 4xx other than 408) it also keeps a conservative reservation as *uncertain* usage, never recorded as actual usage. Failed attempts are persisted (`usage_failures`), so a resumed session cannot reset its budget. A dollar ceiling requires explicitly configured finite non-negative prices (0 is valid). Token estimates are chars/4, so the dollar ceiling cannot guarantee an exact billing limit.
+
 ## Provider layer
 
 `LlmProvider.complete(request) -> { text, usage }`. Four implementations, selected by

@@ -120,6 +120,7 @@ export class SessionService {
       signal: controller.signal,
       backoffMs: this.deps.backoffMs,
       onUsage: (s: StageName, u) => this.store.recordUsage(id, s, u),
+      onFailedAttempt: (s: StageName, f) => this.store.recordFailedAttempt(id, s, f),
       onEvent: (s, level, message) => this.store.log(id, s, level, message),
     };
     this.store.setStatus(id, during);

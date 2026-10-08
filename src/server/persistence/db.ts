@@ -78,6 +78,17 @@ CREATE TABLE IF NOT EXISTS usage (
   estimated INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usage_session ON usage(session_id);
+CREATE TABLE IF NOT EXISTS usage_failures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  at TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  charge TEXT NOT NULL,
+  reserved_input INTEGER NOT NULL,
+  reserved_output INTEGER NOT NULL,
+  reserved_cost_usd REAL
+);
+CREATE INDEX IF NOT EXISTS idx_usage_failures_session ON usage_failures(session_id);
 `;
 
 export function openDatabase(file: string): DatabaseSync {

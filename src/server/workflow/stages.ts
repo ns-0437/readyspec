@@ -9,7 +9,7 @@ import {
   type Question,
   type SupportResult,
 } from "@/shared/schemas";
-import type { Budget } from "@/server/llm/budget";
+import type { Budget, FailedAttempt } from "@/server/llm/budget";
 import type { AnalyzeContext, BriefContext, ClarifyContext, JudgeContext } from "@/server/llm/contexts";
 import { generateStructured } from "@/server/llm/generate";
 import type { LlmProvider, StageName } from "@/server/llm/provider";
@@ -23,6 +23,7 @@ export interface StageEnv {
   backoffMs?: number;
   onUsage: (stage: StageName, u: { inputTokens: number; outputTokens: number; costUsd: number | null; estimated: boolean }) => void;
   onEvent: (stage: string, level: "info" | "warn", message: string) => void;
+  onFailedAttempt?: (stage: StageName, f: FailedAttempt) => void;
 }
 
 const call = <T>(env: StageEnv, stage: StageName, schemaName: string, schema: import("zod").ZodType<T>, user: string, context: unknown, maxOutputTokens: number) =>
@@ -40,6 +41,7 @@ const call = <T>(env: StageEnv, stage: StageName, schemaName: string, schema: im
     backoffMs: env.backoffMs,
     onUsage: (u) => env.onUsage(stage, u),
     onEvent: (level, message) => env.onEvent(stage, level, message),
+    onFailedAttempt: (f) => env.onFailedAttempt?.(stage, f),
   });
 
 const keepKnown = (ids: string[], known: Set<string>): { kept: string[]; dropped: number } => {

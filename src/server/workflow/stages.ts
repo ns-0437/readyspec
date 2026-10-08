@@ -97,18 +97,25 @@ export async function runAnalyze(env: StageEnv, ctx: AnalyzeContext): Promise<Be
 
 /* ------------------------------ clarification ------------------------------ */
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 export async function runClarify(env: StageEnv, ctx: ClarifyContext): Promise<ClarificationOutput> {
   const raw = await call(env, "clarify", "ClarificationOutput", ClarificationOutput, clarifyPrompt(ctx), ctx, (env.outputs ?? STAGE_MAX_OUTPUT).clarify);
   const known = new Set(ctx.evidence.map((e) => e.id));
   const asked = new Set([...ctx.priorQuestions, ...ctx.decisions.map((d) => ({ text: d.question }))].map((q) => norm(q.text)));
-  const usedIds = new Set(ctx.priorQuestions.map((q) => q.id));
+  const usedIds = new Set([...ctx.priorQuestions.map((q) => q.id), ...ctx.decisions.map((d) => d.questionId)]);
   const questions: Question[] = [];
   for (const q of [...raw.questions].sort((a, b) => a.priority - b.priority)) {
-    if (asked.has(norm(q.text))) continue;
+    const normalized = norm(q.text);
+    if (asked.has(normalized)) continue;
+    asked.add(normalized);
     let id = q.id;
-    if (usedIds.has(id)) id = `r${ctx.round}-${id}`;
+    if (usedIds.has(id)) {
+      const base = `r${ctx.round}-${q.id}`;
+      id = base;
+      let suffix = 2;
+      while (usedIds.has(id)) id = `${base}-${suffix++}`;
+    }
     usedIds.add(id);
     questions.push({ ...q, id, priority: questions.length + 1, evidenceIds: q.evidenceIds.filter((e) => known.has(e)) });
     if (questions.length >= MAX_QUESTIONS_PER_ROUND) break;

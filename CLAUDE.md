@@ -7,6 +7,12 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
+**Static demo foundation (2026-10-08):** `demo/` is a separate, browser-only TypeScript frontend.
+`npm run demo:build` compiles it to ignored `dist-demo/`, copying only named public assets and four
+allowlisted fixture excerpts with line ranges, hashes, and commit-pinned links. It never bundles the
+server, reads environment files, or calls providers. `npm run demo:serve` previews at
+`http://127.0.0.1:4173/readyspec/`. The real Next.js app remains the local/full workflow.
+
 Milestones 1-5 built and checked: lint, typecheck, 200 tests, production build, and the UI driven
 end to end in a browser. **Gemini (`gemini-3.6-flash`) is validated live** as of 2026-09-22: full
 staged pipeline completed via `npm run smoke:live` and separately through the real browser UI;

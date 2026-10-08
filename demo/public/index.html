@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Explore ReadySpec: turn a rough ticket into an evidence-backed brief. An interactive, scripted demo with real fixture code, human decisions, and traceable criteria.">
+  <meta name="theme-color" content="#153d35">
+  <title>ReadySpec — A little clarity before the code.</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./assets/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#workspace">Skip to workspace</a>
+  <header class="site-header"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">R<span>↗</span></span>ReadySpec<span class="brand-sub">/ the briefing room</span></a><nav aria-label="Project links"><span class="demo-pill"><span aria-hidden="true">●</span> Interactive demo</span><a href="https://github.com/ns-0437/readyspec">Source code <span aria-hidden="true">↗</span></a></nav></header>
+  <main>
+    <section class="hero" aria-labelledby="hero-title"><div><p class="eyebrow">LESS GUESSWORK. BETTER STARTING POINTS.</p><h1 id="hero-title">A little clarity.<br><span>Before the code.</span></h1><p class="hero-copy">A vague ticket is a conversation waiting to happen.<br>Explore the code, make the decisions, leave with a plan.</p><a class="button primary" href="#workspace">Explore the demo <span aria-hidden="true">↘</span></a><span class="hero-note">No account. No API key.</span></div><aside class="ticket-card" aria-label="The starting ticket"><div class="ticket-meta"><span class="ticket-icon" aria-hidden="true">⌘</span><span>THE STARTING POINT</span><span class="ticket-id">DEMO–001</span></div><blockquote>“Let users pause notifications<br>while they are away.”</blockquote><div class="ticket-bottom"><span class="tag">feature request</span><span>Sounds simple. Until you read the code.</span></div><div class="ticket-foot"><span aria-hidden="true">↳</span> What about security alerts? When does the pause end?</div></aside></section>
+    <section id="workspace" class="workspace" aria-labelledby="workspace-title"><header class="workspace-header"><div><p class="eyebrow">YOUR WORKSPACE</p><h2 id="workspace-title">From request to ready.</h2></div><div class="repo-label"><span aria-hidden="true">◇</span><div>notification-service<small>Fictional TypeScript repository</small></div><span class="tag">read-only</span></div></header>
+      <div class="disclosure"><span class="disclosure-dot" aria-hidden="true"></span><p><strong>Scripted, browser-only demo.</strong> Explore bundled public fixture code and predefined decisions. No repository upload, model call, or server session. This is a product walkthrough, not evidence of model quality.</p></div>
+      <nav class="steps" aria-label="Demo stages"><a class="step active" href="#evidence-panel" aria-current="step"><span>01</span><div>Find the evidence<small>See what exists today</small></div><b aria-hidden="true">↗</b></a><a class="step" href="https://github.com/ns-0437/readyspec#try-locally"><span>02</span><div>Resolve the ambiguity<small>Full flow available locally</small></div></a><a class="step" href="https://github.com/ns-0437/readyspec#try-locally"><span>03</span><div>Review the brief<small>Full flow available locally</small></div></a></nav>
+      <div id="app" aria-live="polite"><p class="loading">Loading public fixture excerpts…</p></div>
+      <noscript><p class="empty">Enable JavaScript for the interactive demo, or <a href="https://github.com/ns-0437/readyspec#try-locally">run the full application locally</a>.</p></noscript>
+    </section>
+    <section class="principles" aria-label="Design principles"><article><span>01 / TRACEABLE</span><h3>Show your working.</h3><p>Code excerpts carry file paths, line ranges, and hashes. Follow an observation back to its source.</p></article><article><span>02 / HUMAN-LED</span><h3>Leave decisions to people.</h3><p>A missing requirement is a question to ask, not permission to invent a product policy.</p></article><article><span>03 / HONEST BY DESIGN</span><h3>A citation is not a proof.</h3><p>Structural checks cannot establish behavioral correctness. Review the reasoning before implementation.</p></article></section>
+    <section class="local-cta"><div><p class="eyebrow">BRING YOUR OWN REPOSITORY</p><h2>Take the full workflow for a spin.</h2><p>The local app adds repository inspection, consent, live providers, and persistent sessions.</p></div><a class="button primary" href="https://github.com/ns-0437/readyspec#try-locally">Run locally <span aria-hidden="true">↗</span></a></section>
+  </main>
+  <footer><a class="brand" href="./">ReadySpec<span class="footer-dot">.</span></a><span>A personal engineering project by Navin Kumar.</span><a href="https://github.com/ns-0437/readyspec/blob/main/docs/evaluation.md">What has actually been measured ↗</a></footer>
+</body>
+</html>

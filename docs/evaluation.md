@@ -77,6 +77,11 @@ Keyword matching: a group matches when every term is present (each term may list
 alternatives). It is deliberately crude and auditable. The human rubric
 (`evals/rubrics/human-rubric.md`) is the authoritative judgement; model-based scoring is not used.
 
+For a human comparison, pair systems by case and repetition, compute the difference within each
+case first, then average across cases. Treat cases—not repeated outputs—as the independent units;
+report how many complete pairs contributed and list missing or partial results. This small,
+hand-authored set supports descriptive comparisons, not statistical significance claims.
+
 ## Running
 
 ```

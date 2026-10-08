@@ -5,12 +5,13 @@ import type { Aggregate, CaseScore, SystemName, SystemOutput } from "./score";
 const pct = (x: number | null) => (x === null ? "n/a" : `${(x * 100).toFixed(0)}%`);
 const num = (x: number | null, d = 2) => (x === null ? "n/a" : x.toFixed(d));
 
-export const LABEL: Record<SystemName, string> = { checklist: "Static checklist", single_prompt: "Single prompt", staged: "ReadySpec staged" };
+export const LABEL: Record<SystemName, string> = { checklist: "Static checklist", single_prompt: "Single prompt (same evidence)", single_prompt_alphabetical: "Single prompt (alphabetical files, secondary)", staged: "ReadySpec staged" };
 
 /** Which aggregate fields are real (not derived from model output) for a system under the fixture provider. */
 export function realUnderFixture(system: SystemName, field: keyof Aggregate): boolean {
   if (system === "checklist") return true;
   if (system === "staged") return ["retrievalRecallRequired", "retrievalPrecision", "distractorFilesPerCase", "cases", "failed", "system"].includes(field);
+  if (system === "single_prompt" || system === "single_prompt_alphabetical") return ["retrievalRecallRequired", "retrievalPrecision", "distractorFilesPerCase", "cases", "system"].includes(field);
   return ["cases", "system"].includes(field);
 }
 
@@ -31,9 +32,11 @@ export function renderReport(opts: { provider: LlmProvider; set: string; aggs: A
   L.push(`Cases: ${cases.length} (${cases.filter((c) => c.heldOut).length} held out). Generated ${new Date().toISOString()}.`, "");
 
   const rows: [string, keyof Aggregate, (v: number | null) => string][] = [
-    ["Required-file recall (retrieval)", "retrievalRecallRequired", pct],
-    ["Precision of files used", "retrievalPrecision", pct],
-    ["Distractor files used / case", "distractorFilesPerCase", (v) => num(v)],
+    ["Context coverage: required-file recall (files supplied to the model)", "retrievalRecallRequired", pct],
+    ["Context coverage: precision of files supplied", "retrievalPrecision", pct],
+    ["Context coverage: distractor files supplied / case", "distractorFilesPerCase", (v) => num(v)],
+    ["Model-selected files: required-file recall (cited or named as affected)", "modelFileRecallRequired", pct],
+    ["Model-selected files: precision", "modelFilePrecision", pct],
     ["Citation validity", "citationValidity", pct],
     ["Observed claims with referenced identifiers found in cited code", "observationsSupportedRate", pct],
     ["Critical ambiguities asked", "ambiguityRecallAsked", pct],
@@ -54,10 +57,13 @@ export function renderReport(opts: { provider: LlmProvider; set: string; aggs: A
   L.push(`| Metric | ${aggs.map((a) => LABEL[a.system]).join(" | ")} |`, `|---|${aggs.map(() => "---").join("|")}|`);
   for (const [name, field, f] of rows) L.push(`| ${name} | ${aggs.map((a) => cell(a, field, f)).join(" | ")} |`);
 
-  const ctxNote = outputs.find((o) => o.system === "single_prompt" && o.context);
-  if (ctxNote?.context) {
-    const truncatedCases = outputs.filter((o) => o.system === "single_prompt" && o.context?.truncated).length;
-    L.push("", `Single-prompt baseline context: ${truncatedCases} of ${outputs.filter((o) => o.system === "single_prompt").length} cases were truncated to the ${24_000}-character budget; otherwise it saw the whole repository (so retrieval gives ReadySpec no advantage on small repositories).`);
+  const sp = outputs.filter((o) => o.system === "single_prompt" || o.system === "single_prompt_alphabetical");
+  if (sp.some((o) => o.system === "single_prompt")) {
+    L.push("", "Single prompt (same evidence) receives exactly the retrieved excerpts the staged workflow receives, in one call, so its context-coverage rows equal staged by construction; differences below come from staging, not retrieval. It measures pre-answer output quality only: neither system gets human answers, so the benefit of a completed clarification loop is not measured. Context coverage (files supplied) and model-selected files (cited or named by the model) are separate rows and must not be added together.");
+  }
+  const alpha = sp.filter((o) => o.system === "single_prompt_alphabetical" && o.context);
+  if (alpha.length) {
+    L.push("", `Secondary alphabetical baseline: ${alpha.filter((o) => o.context?.truncated).length} of ${alpha.length} cases were truncated to the ${24_000}-character budget; it confounds retrieval with staging.`);
   }
 
   L.push("", "## Per-case detail (staged workflow and checklist)", "", "| Case | Held out | System | Req. files | Missed required | Ambiguities asked | Missed | Unnecessary Qs | Violations | Contradictions |", "|---|---|---|---|---|---|---|---|---|---|");

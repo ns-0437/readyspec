@@ -1,6 +1,6 @@
 /**
  * Benchmark runner.
- *   npm run eval -- [--provider fixture|anthropic|gemini|groq] [--set dev|heldout|all] [--systems checklist,single,staged] [--cases id,id]
+ *   npm run eval -- [--provider fixture|anthropic|gemini|groq] [--set dev|heldout|all] [--systems checklist,single,staged,single_alphabetical] [--cases id,id]
  * Results: evals/results/<provider>-<set>-<timestamp>.json and <provider>-<set>-latest.md
  *
  * With the fixture provider, every metric that depends on model output is reported as n/a. Only
@@ -13,7 +13,7 @@ import { loadCases } from "./cases";
 import type { EvalCase } from "./schema";
 import { renderReport, renderVariance } from "./report";
 import { aggregate, scoreRun, type Aggregate, type CaseScore, type SystemName, type SystemOutput } from "./score";
-import { runChecklist, runSinglePrompt, runStaged } from "./systems";
+import { runChecklist, runSinglePrompt, runSinglePromptAlphabetical, runStaged } from "./systems";
 
 const RESULTS_DIR = path.resolve(__dirname, "..", "results");
 
@@ -31,7 +31,7 @@ function humanSheet(cases: EvalCase[], systems: SystemName[]): string {
 
 async function main() {
   const set = arg("set", "dev");
-  const systems = arg("systems", "checklist,single,staged").split(",").map((s) => (s === "single" ? "single_prompt" : s)) as SystemName[];
+  const systems = arg("systems", "checklist,single,staged").split(",").map((s) => (s === "single" ? "single_prompt" : s === "single_alphabetical" ? "single_prompt_alphabetical" : s)) as SystemName[];
   const only = arg("cases", "").split(",").filter(Boolean);
   const provider = createProvider(arg("provider", "") ? { ...process.env, READYSPEC_PROVIDER: arg("provider", "") } : process.env);
 
@@ -54,7 +54,7 @@ async function main() {
     if (repeat > 1) console.log(`Run ${run}/${repeat}`);
     for (const c of cases) {
       for (const system of systems) {
-        const out = system === "checklist" ? await runChecklist() : system === "single_prompt" ? await runSinglePrompt(c, provider) : await runStaged(c, provider);
+        const out = system === "checklist" ? await runChecklist() : system === "single_prompt" ? await runSinglePrompt(c, provider) : system === "single_prompt_alphabetical" ? await runSinglePromptAlphabetical(c, provider) : await runStaged(c, provider);
         outputs.push(out);
         scores.push(scoreRun(c, out));
         process.stdout.write(`  ${c.id} ${system}${out.error ? " ERROR: " + out.error : ""}\n`);

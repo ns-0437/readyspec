@@ -31,6 +31,13 @@ note that this does not prove behavioral correctness. Internal enums (`supported
 approval gating are unchanged. A regression test documents that opposite claims sharing identifiers
 get the same result. Semantic verification does not exist.
 
+**Baseline fairness (2026-10-08):** the main single-prompt baseline now receives the identical
+`investigate()` excerpts as the staged workflow (one call, same system prompt/provider). Context
+coverage (files supplied) and model-selected files are separate metrics. The old alphabetical-file
+baseline remains as a secondary (`--systems single_alphabetical`). It measures pre-answer quality,
+not a completed clarification loop; remaining asymmetries are listed in docs/evaluation.md. No live
+benchmark has been run with it.
+
 ## Purpose, user, scope
 
 - **User:** an engineer or tech lead preparing a ticket for implementation.

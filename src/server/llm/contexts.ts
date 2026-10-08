@@ -37,6 +37,12 @@ export interface JudgeContext {
   evidence: EvidenceItem[];
 }
 
+/** Same-evidence baseline: the identical retrieved excerpts the staged workflow receives. */
+export interface SinglePromptEvidenceContext {
+  ticket: string;
+  evidence: EvidenceItem[];
+}
+
 export interface SinglePromptContext {
   ticket: string;
   files: { path: string; content: string; truncated: boolean }[];

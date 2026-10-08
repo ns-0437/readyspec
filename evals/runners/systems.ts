@@ -2,7 +2,8 @@ import path from "node:path";
 import { Budget, costUsd } from "@/server/llm/budget";
 import { generateStructured } from "@/server/llm/generate";
 import type { LlmProvider } from "@/server/llm/provider";
-import { SYSTEM_PROMPT, singlePromptPrompt } from "@/server/llm/prompts";
+import type { SinglePromptEvidenceContext } from "@/server/llm/contexts";
+import { SYSTEM_PROMPT, singlePromptEvidencePrompt, singlePromptPrompt } from "@/server/llm/prompts";
 import { buildEvidence } from "@/server/repository/evidence";
 import { DEFAULT_RETRIEVAL } from "@/server/repository/search";
 import { createSnapshot } from "@/server/repository/snapshot";
@@ -51,7 +52,7 @@ function makeEnv(provider: LlmProvider) {
 }
 
 const empty = (system: SystemOutput["system"]): SystemOutput => ({
-  system, files: [], hallucinatedFiles: [], filesFromModel: false, questions: [], observations: [], assumptions: [], criteria: [],
+  system, contextFiles: [], modelFiles: [], hallucinatedFiles: [], questions: [], observations: [], assumptions: [], criteria: [],
   contradictions: [], insufficientEvidence: [], verification: null, latencyMs: 0, usage: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null },
 });
 
@@ -71,18 +72,78 @@ export async function runChecklist(): Promise<SystemOutput> {
   return { ...empty("checklist"), questions: CHECKLIST.map((text) => ({ text, why: "" })), latencyMs: performance.now() - t0 };
 }
 
-/* --------------------------- 2. single-prompt baseline --------------------------- */
+/* --------------------------- 2. single-prompt baselines --------------------------- */
+
+/** Maps a single-prompt model result onto SystemOutput. Model-selected files stay in `modelFiles`. */
+function fillFromSinglePrompt(out: SystemOutput, res: SinglePromptOutput, snap: Snapshot): void {
+  const fileSet = new Set<string>();
+  const observations: ObservationOut[] = res.observations.map((o) => {
+    const evidence: EvidenceItem[] = [];
+    let invalid = 0;
+    for (const cite of o.citations) {
+      const f = snap.files.get(cite.path);
+      const total = f ? f.content.split("\n").length : 0;
+      if (!f || cite.startLine < 1 || cite.endLine < cite.startLine || cite.endLine > total) {
+        invalid++;
+        if (!f) out.hallucinatedFiles.push(cite.path);
+        continue;
+      }
+      fileSet.add(cite.path);
+      evidence.push(buildEvidence(snap, { path: cite.path, startLine: cite.startLine, endLine: cite.endLine, symbol: null, score: 0, matchedTerms: [], retrievalReason: "cited by single-prompt model" }));
+    }
+    return { id: o.id, statement: o.statement, evidence, invalidCitations: invalid, totalCitations: o.citations.length };
+  });
+  for (const p of res.filesToChange) {
+    if (snap.files.has(p)) fileSet.add(p);
+    else out.hallucinatedFiles.push(p);
+  }
+  out.modelFiles = [...fileSet];
+  out.observations = observations;
+  out.questions = res.questions.map((q) => ({ text: q.text, why: q.whyItMatters }));
+  out.assumptions = res.assumptions.map((a) => a.text);
+  out.criteria = res.acceptanceCriteria.map((a) => a.text);
+}
 
 /**
- * One model call. It receives repository files in path order until it reaches the same character
- * budget the staged workflow's retriever gets; there is no retrieval, clarification stage or
- * verification. For repositories smaller than the budget it therefore sees everything.
+ * MAIN single-prompt baseline (same evidence). It calls the same investigate() as the staged
+ * workflow, so it receives the identical initial excerpts (ids, paths, line ranges, order), then
+ * makes ONE structured call under the same SYSTEM_PROMPT and provider/model. This isolates what
+ * staging adds (separate analyze/clarify/brief calls, verification) from retrieval quality.
+ * It measures pre-answer output quality only: neither system here gets human answers, so the
+ * benefit of a completed clarification loop is not measured.
  */
-export async function runSinglePrompt(c: EvalCase, provider: LlmProvider, budgetChars = DEFAULT_RETRIEVAL.maxChars): Promise<SystemOutput> {
+export async function runSinglePrompt(c: EvalCase, provider: LlmProvider): Promise<SystemOutput> {
   const t0 = performance.now();
   const snap = snapshotFor(c.repo);
   const out = empty("single_prompt");
-  out.filesFromModel = true;
+  const { env, finish } = makeEnv(provider);
+  try {
+    const evidence = investigate(snap, c.ticket).evidence;
+    out.contextFiles = [...new Set(evidence.map((e) => e.path))];
+    out.context = { kind: "same_evidence", filesInPrompt: out.contextFiles.length, filesInRepo: snap.files.size, truncated: false, excerptsInPrompt: evidence.length };
+    const ctx: SinglePromptEvidenceContext = { ticket: c.ticket, evidence };
+    const res = await generateStructured({
+      provider, budget: env.budget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptEvidencePrompt(ctx), schema: SinglePromptOutput,
+      schemaName: "SinglePromptOutput", maxOutputTokens: 6000, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
+    });
+    fillFromSinglePrompt(out, res, snap);
+  } catch (e) {
+    out.error = (e as Error).message;
+  }
+  out.latencyMs = performance.now() - t0;
+  out.usage = finish();
+  return out;
+}
+
+/**
+ * SECONDARY baseline (alphabetical). One call over repository files in path order until the same
+ * character budget the retriever gets: no retrieval. Confounds retrieval quality with the benefit
+ * of staging, so it is not the main comparison. Run with --systems single_alphabetical.
+ */
+export async function runSinglePromptAlphabetical(c: EvalCase, provider: LlmProvider, budgetChars = DEFAULT_RETRIEVAL.maxChars): Promise<SystemOutput> {
+  const t0 = performance.now();
+  const snap = snapshotFor(c.repo);
+  const out = empty("single_prompt_alphabetical");
   const { env, finish } = makeEnv(provider);
   try {
     const files: { path: string; content: string; truncated: boolean }[] = [];
@@ -94,39 +155,14 @@ export async function runSinglePrompt(c: EvalCase, provider: LlmProvider, budget
       files.push({ path: f.path, content: truncated ? f.content.slice(0, room) : f.content, truncated });
       used += Math.min(room, f.content.length);
     }
-    out.context = { filesInPrompt: files.length, filesInRepo: snap.files.size, truncated: files.length < snap.files.size || files.some((f) => f.truncated) };
+    out.contextFiles = files.map((f) => f.path);
+    out.context = { kind: "alphabetical", filesInPrompt: files.length, filesInRepo: snap.files.size, truncated: files.length < snap.files.size || files.some((f) => f.truncated) };
     const ctx = { ticket: c.ticket, files };
     const res = await generateStructured({
       provider, budget: env.budget, stage: "single_prompt", system: SYSTEM_PROMPT, user: singlePromptPrompt(ctx), schema: SinglePromptOutput,
       schemaName: "SinglePromptOutput", maxOutputTokens: 6000, context: ctx, backoffMs: env.backoffMs, onUsage: (u) => env.onUsage("single_prompt", u),
     });
-
-    const fileSet = new Set<string>();
-    const observations: ObservationOut[] = res.observations.map((o) => {
-      const evidence: EvidenceItem[] = [];
-      let invalid = 0;
-      for (const cite of o.citations) {
-        const f = snap.files.get(cite.path);
-        const total = f ? f.content.split("\n").length : 0;
-        if (!f || cite.startLine < 1 || cite.endLine < cite.startLine || cite.endLine > total) {
-          invalid++;
-          if (!f) out.hallucinatedFiles.push(cite.path);
-          continue;
-        }
-        fileSet.add(cite.path);
-        evidence.push(buildEvidence(snap, { path: cite.path, startLine: cite.startLine, endLine: cite.endLine, symbol: null, score: 0, matchedTerms: [], retrievalReason: "cited by single-prompt model" }));
-      }
-      return { id: o.id, statement: o.statement, evidence, invalidCitations: invalid, totalCitations: o.citations.length };
-    });
-    for (const p of res.filesToChange) {
-      if (snap.files.has(p)) fileSet.add(p);
-      else out.hallucinatedFiles.push(p);
-    }
-    out.files = [...fileSet];
-    out.observations = observations;
-    out.questions = res.questions.map((q) => ({ text: q.text, why: q.whyItMatters }));
-    out.assumptions = res.assumptions.map((a) => a.text);
-    out.criteria = res.acceptanceCriteria.map((a) => a.text);
+    fillFromSinglePrompt(out, res, snap);
   } catch (e) {
     out.error = (e as Error).message;
   }
@@ -149,7 +185,7 @@ export async function runStaged(c: EvalCase, provider: LlmProvider): Promise<Sys
   try {
     const inv = investigate(snap, c.ticket);
     const evidence = inv.evidence;
-    out.files = [...new Set(evidence.map((e) => e.path))];
+    out.contextFiles = [...new Set(evidence.map((e) => e.path))];
     const analysis = await runAnalyze(env, { ticket: c.ticket, evidence, inspection: inv.inspection });
     const clar = await runClarify(env, { ticket: c.ticket, analysis, evidence, decisions: [], priorQuestions: [], round: 1 });
     const decisions: Decision[] = clar.questions.map((q) => ({ questionId: q.id, question: q.text, round: 1, answer: "", source: "deferred", answeredAt: new Date().toISOString() }));
@@ -165,6 +201,9 @@ export async function runStaged(c: EvalCase, provider: LlmProvider): Promise<Sys
       invalidCitations: report.citations.invalid.filter((i) => o.evidenceIds.includes(i.evidenceId)).length,
       totalCitations: o.evidenceIds.length,
     }));
+    // Model-selected files, symmetric with the baseline's cited + filesToChange: files cited in
+    // observations plus the brief's affected components (only those that exist in the snapshot).
+    out.modelFiles = [...new Set([...out.observations.flatMap((o) => o.evidence.map((e) => e.path)), ...content.components.map((x) => x.path)])].filter((p) => snap.files.has(p));
     out.assumptions = content.assumptions.map((a) => a.text);
     out.criteria = content.acceptanceCriteria.map((a) => a.text);
     out.contradictions = analysis.contradictions.map((x) => x.description);

@@ -1,5 +1,5 @@
 import type { EvidenceItem } from "@/shared/schemas";
-import type { AnalyzeContext, BriefContext, ClarifyContext, JudgeContext, SinglePromptContext } from "../contexts";
+import type { AnalyzeContext, BriefContext, ClarifyContext, JudgeContext, SinglePromptContext, SinglePromptEvidenceContext } from "../contexts";
 
 /** Neutralise anything that could close or spoof our data delimiters. */
 function fence(text: string): string {
@@ -133,6 +133,26 @@ export function judgePrompt(ctx: JudgeContext): string {
 Return judgements: [{itemId, verdict: supported|weak|unsupported, reason}]. "supported" only when the excerpts directly show it; "weak" when related but incomplete; "unsupported" when they do not show it.
 
 ${items}`;
+}
+
+/**
+ * Same-evidence baseline: ONE call over exactly the excerpts (ids, paths, line ranges, order)
+ * the staged workflow's analyze/clarify/brief stages receive, rendered by the same renderEvidence().
+ * Runs under the same SYSTEM_PROMPT, so the evidence/uncertainty/no-invented-decisions rules match.
+ */
+export function singlePromptEvidencePrompt(ctx: SinglePromptEvidenceContext): string {
+  return `TASK: one-shot readiness analysis over the excerpts below (the only repository content you have). Produce JSON with:
+- observations: statements about EXISTING behavior shown by the excerpts, each with citations [{path,startLine,endLine}] taken from the excerpt headers and line numbers. State only what the cited lines show; if the excerpts do not show something, do not assert it.
+- questions: at most 5 prioritized clarification questions for decisions the ticket and excerpts leave open (same fields as the clarification stage; evidenceIds may be empty). Never choose product policy yourself.
+- assumptions: explicit, temporary assumptions you are making.
+- acceptanceCriteria: proposed acceptance criteria (proposals, never phrased as existing behavior).
+- filesToChange: repository paths you believe would need changing (these may or may not be among the excerpts).
+
+<ticket>
+${fence(ctx.ticket)}
+</ticket>
+
+${renderEvidence(ctx.evidence)}`;
 }
 
 export function singlePromptPrompt(ctx: SinglePromptContext): string {

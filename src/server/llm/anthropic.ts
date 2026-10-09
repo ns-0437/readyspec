@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ProviderInfo } from "@/shared/schemas";
 import { redactSecrets } from "@/shared/redact";
-import { CancelledError, ProviderError, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
+import { CancelledError, ProviderError, parseProviderJson, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
 
 const AnthropicResponse = z.object({
   content: z.array(z.object({ type: z.string(), name: z.string().optional(), input: z.unknown().optional(), text: z.string().optional() })),
@@ -79,7 +79,7 @@ export class AnthropicProvider implements LlmProvider {
       throw new ProviderError(`Model API returned ${res.status}${detail ? `: ${detail}` : ""}`, { retryable, status: res.status, retryAfterMs: parseRetryAfterMs(res.headers.get("retry-after")) });
     }
 
-    const parsed = AnthropicResponse.safeParse(await res.json());
+    const parsed = AnthropicResponse.safeParse(await parseProviderJson(res));
     if (!parsed.success) throw new ProviderError("Model API returned an unexpected response shape", { retryable: false });
     const tool = parsed.data.content.find((c) => c.type === "tool_use" && c.name === TOOL_NAME);
     const text = tool ? JSON.stringify(tool.input) : parsed.data.content.find((c) => c.type === "text")?.text;

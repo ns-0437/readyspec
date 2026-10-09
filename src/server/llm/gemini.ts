@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ProviderInfo } from "@/shared/schemas";
 import { redactSecrets } from "@/shared/redact";
-import { CancelledError, ProviderError, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
+import { CancelledError, ProviderError, parseProviderJson, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
 
 const GeminiResponse = z.object({
   candidates: z
@@ -123,7 +123,7 @@ export class GeminiProvider implements LlmProvider {
       throw new ProviderError(`Model API returned ${res.status}${detail ? `: ${detail}` : ""}`, { retryable, status: res.status, retryAfterMs: parseRetryAfterMs(res.headers.get("retry-after")) });
     }
 
-    const parsed = GeminiResponse.safeParse(await res.json());
+    const parsed = GeminiResponse.safeParse(await parseProviderJson(res));
     // Every real response has one of these; neither present means the body isn't a Gemini response at all.
     if (!parsed.success || (!parsed.data.candidates && !parsed.data.promptFeedback)) {
       throw new ProviderError("Model API returned an unexpected response shape", { retryable: false });

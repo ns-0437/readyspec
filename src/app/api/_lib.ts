@@ -6,8 +6,16 @@ import { ConflictError, NotFoundError, RuleViolationError } from "@/server/workf
 
 export type Ctx = { params: Promise<{ id: string }> };
 
+class PayloadTooLargeError extends Error {
+  constructor() {
+    super("Request body too large");
+    this.name = "PayloadTooLargeError";
+  }
+}
+
 /** Map domain errors to HTTP responses; anything unexpected becomes a redacted 500. */
 export function toResponse(e: unknown): NextResponse {
+  if (e instanceof PayloadTooLargeError) return NextResponse.json({ error: e.message }, { status: 413 });
   if (e instanceof ZodError) {
     return NextResponse.json({ error: "Invalid request", issues: e.issues.map((i) => ({ path: i.path.join("."), message: i.message })) }, { status: 400 });
   }
@@ -23,7 +31,7 @@ export function toResponse(e: unknown): NextResponse {
 export async function readBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
   const contentLength = Number(req.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > 400_000) {
-    throw new RuleViolationError("Request body too large");
+    throw new PayloadTooLargeError();
   }
   const reader = req.body?.getReader();
   if (!reader) return schema.parse({});
@@ -35,7 +43,7 @@ export async function readBody<T>(req: Request, schema: ZodType<T>): Promise<T> 
     byteLength += value.byteLength;
     if (byteLength > 400_000) {
       await reader.cancel().catch(() => undefined);
-      throw new RuleViolationError("Request body too large");
+      throw new PayloadTooLargeError();
     }
     chunks.push(value);
   }

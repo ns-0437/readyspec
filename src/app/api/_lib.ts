@@ -13,9 +13,17 @@ class PayloadTooLargeError extends Error {
   }
 }
 
+class UnsupportedMediaTypeError extends Error {
+  constructor() {
+    super("Content-Type must be application/json");
+    this.name = "UnsupportedMediaTypeError";
+  }
+}
+
 /** Map domain errors to HTTP responses; anything unexpected becomes a redacted 500. */
 export function toResponse(e: unknown): NextResponse {
   if (e instanceof PayloadTooLargeError) return NextResponse.json({ error: e.message }, { status: 413 });
+  if (e instanceof UnsupportedMediaTypeError) return NextResponse.json({ error: e.message }, { status: 415 });
   if (e instanceof ZodError) {
     return NextResponse.json({ error: "Invalid request", issues: e.issues.map((i) => ({ path: i.path.join("."), message: i.message })) }, { status: 400 });
   }
@@ -29,6 +37,10 @@ export function toResponse(e: unknown): NextResponse {
 }
 
 export async function readBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
+  const contentType = req.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+  if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
+    throw new UnsupportedMediaTypeError();
+  }
   const contentLength = Number(req.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > 400_000) {
     throw new PayloadTooLargeError();

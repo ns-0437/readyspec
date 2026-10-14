@@ -34,7 +34,7 @@ jobs:
       - run: npx vitest run tests/demo-model.test.ts tests/demo-draft.test.ts
       - run: npm run demo:build
       - run: npm run demo:check
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist-demo

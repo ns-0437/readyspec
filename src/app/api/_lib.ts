@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { redactSecrets } from "@/shared/redact";
+import { BudgetConfigError } from "@/server/llm/budget";
 import { RepositoryAccessError } from "@/server/repository/safe-fs";
 import { ConflictError, NotFoundError, RuleViolationError } from "@/server/workflow/errors";
 
@@ -32,6 +33,8 @@ export function toResponse(e: unknown): NextResponse {
   if (e instanceof NotFoundError) return NextResponse.json({ error: e.message }, { status: 404 });
   if (e instanceof ConflictError) return NextResponse.json({ error: e.message }, { status: 409 });
   if (e instanceof RuleViolationError) return NextResponse.json({ error: e.message }, { status: 422 });
+  // Operator configuration: the message names the variables to fix, so hiding it would leave no way to recover.
+  if (e instanceof BudgetConfigError) return NextResponse.json({ error: redactSecrets(e.message) }, { status: 503 });
   console.error("[readyspec] unexpected API error:", redactSecrets((e as Error)?.stack ?? String(e)));
   return NextResponse.json({ error: "Internal error" }, { status: 500 });
 }

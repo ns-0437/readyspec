@@ -7,8 +7,9 @@ A live run creates it once, before the first request, and never overwrites it; f
 
 **Sheet columns:** `repetition, case_id, system, output_file, held_out, brief_usable_as_is(0-2),
 critical_gaps_missed(count), wrong_or_unsupported_claims(count), unnecessary_questions(count),
-minutes_to_make_usable, reviewer, notes`. The first five are filled; you fill the rest. There is no column
-for item 5 below (silent policy decisions): record that count in `notes`.
+silent_policy_decisions(count), minutes_to_make_usable, reviewer, notes`. The first five are filled; you
+fill the rest. The six score columns follow items 1-6 below, in order. Sheets generated before the
+`silent_policy_decisions` column existed are never rewritten: record that count in their `notes`.
 
 **Finding the output for a row:** `output_file` is a path relative to the same run directory, shaped
 `results/rep<repetition>/<case_id>__<system>.json`. Open it and read `output` (questions, observations

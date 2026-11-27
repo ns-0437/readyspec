@@ -7,7 +7,7 @@ import { loadCases } from "../evals/runners/cases";
 import { costCell } from "../evals/runners/report";
 import { runBenchmark } from "../evals/runners/run";
 import { aggregate, scoreRun, type SystemName, type SystemOutput } from "../evals/runners/score";
-import { createRunDir, readSavedResults, writeOnce } from "../evals/runners/store";
+import { createRunDir, humanSheet, readSavedResults, writeOnce } from "../evals/runners/store";
 
 const cases = loadCases().filter((c) => !c.heldOut).slice(0, 2);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "readyspec-eval-"));
@@ -97,5 +97,19 @@ describe("failed-run accounting", () => {
 
     const nothing = agg([out("staged", { error: "x", usage: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null, exact: false } })]);
     expect(costCell(nothing)).toMatch(/^n\/a \(/); // no known figure at all: say so, don't print $0
+  });
+});
+
+describe("human scoring sheet and rubric", () => {
+  it("has one score column per rubric item, in rubric order, and lists the same columns in the rubric", () => {
+    const sheet = humanSheet(cases, ["staged"], 1).trim().split("\n");
+    const header = sheet[0]!.split(",");
+    const scoreColumns = header.slice(header.indexOf("held_out") + 1, header.indexOf("reviewer"));
+    const rubric = fs.readFileSync(path.resolve("evals", "rubrics", "human-rubric.md"), "utf8");
+    const items = [...rubric.matchAll(/^\*\*\d+\. /gm)];
+    expect(scoreColumns).toHaveLength(items.length);
+    expect(scoreColumns[4]).toBe("silent_policy_decisions(count)"); // rubric item 5
+    expect(rubric.replace(/\s+/g, " ")).toContain(header.join(", "));
+    expect(sheet.slice(1).every((row) => row.split(",").length === header.length)).toBe(true);
   });
 });

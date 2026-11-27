@@ -17,10 +17,12 @@ export function readCommit(root: string): string | null {
   try {
     const gitDir = path.join(root, ".git");
     if (!fs.lstatSync(gitDir).isDirectory()) return null;
+    // Compare real paths with real paths: a parent may be aliased (short name, junction, symlink).
+    const realGitDir = fs.realpathSync.native(gitDir);
     const readGitFile = (file: string): string | null => {
       try {
         const stat = fs.lstatSync(file);
-        if (!stat.isFile() || !isInside(gitDir, fs.realpathSync.native(file))) return null;
+        if (!stat.isFile() || !isInside(realGitDir, fs.realpathSync.native(file))) return null;
         return fs.readFileSync(file, "utf8");
       } catch {
         return null;

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createProvider } from "@/server/llm";
 import { limitsFromEnv } from "@/server/llm/budget";
 import { discoverRepositories } from "@/server/repository/discover";
-import { allowedRoots } from "@/server/repository/safe-fs";
+import { allowedRoots, isInside } from "@/server/repository/safe-fs";
 import { defaultRoots } from "@/server/workflow/service";
 import { withHandler } from "../_lib";
 
@@ -15,7 +15,7 @@ export const GET = () =>
   withHandler(() => {
     const roots = allowedRoots(defaultRoots());
     const fixturesRoot = path.join(process.cwd(), "fixtures");
-    const repositories = discoverRepositories(roots).map((r) => ({ ...r, isDemo: r.path.startsWith(fixturesRoot) }));
+    const repositories = discoverRepositories(roots).map((r) => ({ ...r, isDemo: isInside(fixturesRoot, r.path) }));
     let provider;
     try {
       provider = createProvider().info;

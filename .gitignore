@@ -7,6 +7,10 @@ evals/results/*.json
 next-env.d.ts
 .env
 .env.local
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 !fixtures/demo-repository/.env
 
 evals/results/runs/

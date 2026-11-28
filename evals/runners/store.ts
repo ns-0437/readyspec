@@ -72,13 +72,13 @@ export function readSavedResults(dir: string): SavedResult[] {
 
 /** One row per case x system x repetition; `output_file` ties each row to its saved raw result. */
 export function humanSheet(cases: EvalCase[], systems: SystemName[], repeat: number): string {
-  const head = ["repetition", "case_id", "system", "output_file", "held_out", "brief_usable_as_is(0-2)", "critical_gaps_missed(count)", "wrong_or_unsupported_claims(count)", "unnecessary_questions(count)", "minutes_to_make_usable", "reviewer", "notes"];
+  const head = ["repetition", "case_id", "system", "output_file", "held_out", "brief_usable_as_is(0-2)", "critical_gaps_missed(count)", "wrong_or_unsupported_claims(count)", "unnecessary_questions(count)", "silent_policy_decisions(count)", "minutes_to_make_usable", "reviewer", "notes"];
   const rows = [head.join(",")];
   for (let rep = 1; rep <= repeat; rep++) {
     for (const c of cases) {
       for (const s of systems) {
         const file = `results/rep${rep}/${c.id}__${s}.json`;
-        rows.push([String(rep), c.id, s, file, c.heldOut ? "yes" : "no", "", "", "", "", "", "", ""].join(","));
+        rows.push([String(rep), c.id, s, file, c.heldOut ? "yes" : "no", ...Array<string>(head.length - 5).fill("")].join(","));
       }
     }
   }

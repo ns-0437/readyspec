@@ -90,6 +90,16 @@ describe("feasibility plan", () => {
     expect(ok.evidence[0]!.requiredRetained).toBe(true);
     expect(planPilot({ cases: sel, systems: [...systems], prices: null }).evidence[0]!.excluded).toEqual([]); // default budget excludes nothing
   });
+
+  it("flags a required file that keeps some but not all of its excerpts, even though it still counts as retained", () => {
+    const plan = planPilot({ cases: sel, systems: [...systems], prices: null, profile: resolveProfile("compact", { evidenceMaxChars: "5000" }) });
+    const dispatcher = plan.evidence[0]!.requiredFiles.find((f) => f.path === "src/notifications/dispatcher.ts")!;
+    expect(dispatcher.fullExcerpts).toBe(3);
+    expect(dispatcher.keptExcerpts).toBe(2); // partial loss: still "retained" (>0), but not every excerpt of this file
+    expect(plan.evidence[0]!.requiredRetained).toBe(true); // the coarse, file-level signal stays true
+    const text = renderPlan(plan, { providerLabel: "mock", systems: [...systems], runLimitsSet: false });
+    expect(text).toContain("only 2/3 of its excerpts kept (counts as retained, but some of its evidence was dropped)");
+  });
 });
 
 describe("prompt trimming", () => {

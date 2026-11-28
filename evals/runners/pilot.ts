@@ -60,6 +60,14 @@ export interface StagePlan {
   maxOutput: number;
 }
 
+export interface RequiredFileCoverage {
+  path: string;
+  /** Excerpts of this file kept after the profile's evidence cap (0 under the default budget means the case itself never retrieves it). */
+  keptExcerpts: number;
+  /** Excerpts of this file under the default, uncapped retrieval budget. */
+  fullExcerpts: number;
+}
+
 export interface EvidenceReport {
   caseId: string;
   keptExcerpts: number;
@@ -67,7 +75,12 @@ export interface EvidenceReport {
   fullChars: number;
   /** Excerpts the default retrieval would send that this profile's shared budget drops (empty with the default budget). */
   excluded: { path: string; lines: string; chars: number }[];
-  /** Whether the case's expected required files are still among the kept excerpts (evaluation metadata). */
+  /** Per required file, how many of its excerpts survive. A file can keep some of its excerpts and still lose others. */
+  requiredFiles: RequiredFileCoverage[];
+  /**
+   * Whether every required file still has at least one surviving excerpt. True here does NOT mean
+   * every excerpt of that file survived: check requiredFiles for partial loss within a "retained" file.
+   */
   requiredRetained: boolean;
 }
 
@@ -108,14 +121,19 @@ export function planPilot(opts: { cases: { c: EvalCase; role: string }[]; system
     const inv = investigate(snap, c.ticket, retrievalFor(profile)); // local and deterministic: the same evidence both systems get
     const full = profile.evidenceMaxChars ? investigate(snap, c.ticket).evidence : inv.evidence;
     const kept = new Set(inv.evidence.map((e) => e.id));
-    const keptPaths = new Set(inv.evidence.map((e) => e.path));
+    const requiredFiles = c.expectedFiles.required.map((path) => ({
+      path,
+      keptExcerpts: inv.evidence.filter((e) => e.path === path).length,
+      fullExcerpts: full.filter((e) => e.path === path).length,
+    }));
     evidence.push({
       caseId: c.id,
       keptExcerpts: inv.evidence.length,
       keptChars: inv.evidence.reduce((s, e) => s + e.excerpt.length, 0),
       fullChars: full.reduce((s, e) => s + e.excerpt.length, 0),
       excluded: full.filter((e) => !kept.has(e.id)).map((e) => ({ path: e.path, lines: `${e.startLine}-${e.endLine}`, chars: e.excerpt.length })),
-      requiredRetained: c.expectedFiles.required.every((f) => keptPaths.has(f)),
+      requiredFiles,
+      requiredRetained: requiredFiles.every((f) => f.keptExcerpts > 0),
     });
     const row = (system: SystemName, stage: StagePlan["stage"], schema: number, promptLow: number, promptHigh: number, known: boolean, maxOutput: number) =>
       rows.push({ caseId: c.id, system, stage, systemTokens: sysTokens, schemaTokens: schema, inputLow: sysTokens + promptLow + schema, inputHigh: sysTokens + promptHigh + schema, known, maxOutput });
@@ -184,6 +202,11 @@ export function renderPlan(plan: PilotPlan, ctx: { providerLabel: string; system
   for (const e of plan.evidence) {
     L.push(`  ${e.caseId}: ${e.keptExcerpts} excerpts, ${e.keptChars} chars${e.fullChars !== e.keptChars ? ` of ${e.fullChars} under the default budget` : ""}; required files ${e.requiredRetained ? "retained" : "NOT ALL RETAINED"}`);
     for (const x of e.excluded) L.push(`    excluded: ${x.path}:${x.lines} (${x.chars} chars)`);
+    // "retained" above only means each required file has at least one surviving excerpt, not all of
+    // them: flag a file that lost some of its excerpts even though it still counts as retained.
+    for (const f of e.requiredFiles) {
+      if (f.keptExcerpts > 0 && f.keptExcerpts < f.fullExcerpts) L.push(`    required file ${f.path}: only ${f.keptExcerpts}/${f.fullExcerpts} of its excerpts kept (counts as retained, but some of its evidence was dropped)`);
+    }
   }
   L.push("", "Per-request estimates (tokens = chars/4 heuristic, NOT exact tokenization; input = system + prompt + schema):");
   for (const r of plan.rows) {

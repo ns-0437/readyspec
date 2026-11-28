@@ -116,3 +116,35 @@ describe("API", () => {
     expect(JSON.stringify(await res.json())).not.toMatch(/stack|node_modules/);
   });
 });
+
+describe("budget misconfiguration", () => {
+  it("returns the explanation instead of a generic Internal error", async () => {
+    const saved = process.env.READYSPEC_MAX_COST_USD;
+    process.env.READYSPEC_MAX_COST_USD = "banana";
+    try {
+      const res = await call("repos", "GET", null);
+      expect(res.status).toBe(503);
+      expect(((await res.json()) as { error: string }).error).toContain("READYSPEC_MAX_COST_USD must be a finite non-negative number");
+    } finally {
+      if (saved === undefined) delete process.env.READYSPEC_MAX_COST_USD;
+      else process.env.READYSPEC_MAX_COST_USD = saved;
+    }
+  });
+
+  it("explains a dollar ceiling without prices, and redacts a secret pasted into the wrong variable", async () => {
+    const { toResponse } = await import("@/app/api/_lib");
+    const { Budget, BudgetConfigError } = await import("@/server/llm/budget");
+    let thrown: unknown;
+    try {
+      new Budget({ maxCalls: 1, maxInputTokens: 1, maxOutputTokens: 1, maxCostUsd: 1 }, { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null, estimated: false }, null);
+    } catch (e) {
+      thrown = e;
+    }
+    const res = toResponse(thrown);
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { error: string }).error).toContain("READYSPEC_PRICE_IN_PER_MTOK");
+
+    const leaked = toResponse(new BudgetConfigError('got "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"'));
+    expect(((await leaked.json()) as { error: string }).error).not.toContain("abcdefghijklmnopqrstuvwxyz");
+  });
+});

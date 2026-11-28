@@ -59,7 +59,15 @@ function evidencePanel() {
     const query = search.value.trim().toLowerCase();
     const matches = data.evidence.filter((e) => `${e.path} ${e.text} ${e.label}`.toLowerCase().includes(query));
     list.replaceChildren();
-    if (!matches.length) list.append(element("p", "code-note", "No matching excerpts. Try “security” or clear the filter."));
+    if (!matches.length) {
+      const empty = element("p", "code-note", "No matching excerpts. Try “security” or clear the filter.");
+      empty.setAttribute("role", "status");
+      list.append(empty);
+      display.replaceChildren(empty.cloneNode(true));
+    } else {
+      if (!matches.some((e) => e.id === selectedEvidence)) selectedEvidence = matches[0]!.id;
+      showSource();
+    }
     matches.forEach((e) => {
       const b = button("", `file-button${e.id === selectedEvidence ? " selected" : ""}`, () => { selectedEvidence = e.id; showSource(); drawList(); list.querySelector<HTMLButtonElement>(".selected")?.focus(); });
       b.setAttribute("aria-pressed", String(e.id === selectedEvidence));

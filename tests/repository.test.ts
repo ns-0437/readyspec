@@ -130,6 +130,25 @@ describe("snapshot: exclusions and safety", () => {
     expect(readCommit(outside)).toBeNull();
   });
 
+  it("reads the commit when the repository is reached through an aliased parent directory", () => {
+    // A junction on Windows, a symlink elsewhere: same situation as a Windows short name or macOS /var.
+    const base = fs.mkdtempSync(path.join(tmp, "alias-"));
+    fs.mkdirSync(path.join(base, "real", "repo", ".git"), { recursive: true });
+    fs.writeFileSync(path.join(base, "real", "repo", ".git", "HEAD"), "89abcdef0123456789abcdef0123456789abcdef\n");
+    fs.symlinkSync(path.join(base, "real"), path.join(base, "alias"), "junction");
+    expect(readCommit(path.join(base, "alias", "repo"))).toBe("89abcdef0123456789abcdef0123456789abcdef");
+  });
+
+  it("still refuses git metadata that resolves outside .git", () => {
+    const base = fs.mkdtempSync(path.join(tmp, "escape-"));
+    fs.mkdirSync(path.join(base, "elsewhere"), { recursive: true });
+    fs.writeFileSync(path.join(base, "elsewhere", "main"), "89abcdef0123456789abcdef0123456789abcdef\n");
+    fs.mkdirSync(path.join(base, "repo", ".git", "refs"), { recursive: true });
+    fs.writeFileSync(path.join(base, "repo", ".git", "HEAD"), "ref: refs/heads/main\n");
+    fs.symlinkSync(path.join(base, "elsewhere"), path.join(base, "repo", ".git", "refs", "heads"), "junction");
+    expect(readCommit(path.join(base, "repo"))).toBeNull();
+  });
+
   it("refuses an empty repository", () => {
     const empty = fs.mkdtempSync(path.join(tmp, "empty-"));
     expect(() => createSnapshot(empty)).toThrow(RepositoryAccessError);

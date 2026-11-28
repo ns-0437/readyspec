@@ -45,6 +45,15 @@ export class ProviderError extends Error {
   }
 }
 
+/** Parse a successful provider response without leaking adapter-level JSON errors into the workflow. */
+export async function parseProviderJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new ProviderError("Model API returned invalid JSON", { retryable: false });
+  }
+}
+
 /** Parses a standard `Retry-After` header (seconds, or an HTTP-date) into milliseconds. */
 export function parseRetryAfterMs(header: string | null): number | null {
   if (!header) return null;

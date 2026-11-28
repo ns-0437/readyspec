@@ -7,9 +7,16 @@ brief out. Personal portfolio project. Deeper docs: [docs/product.md](docs/produ
 
 ## Status (update every milestone)
 
+**Local fixes (2026-11-27):** budget configuration errors now reach the client as a 503 with the
+message (not "Internal error"); the UI usage line counts failed requests and shows their held tokens
+as estimates (`src/shared/usage.ts`, checked in the browser with the fixture provider); the human
+scoring sheet has a `silent_policy_decisions` column matching the rubric; `readCommit` works when a
+parent directory is aliased (short name, junction, symlink). `npm run check` passes (299 tests), all
+20 fixture tests pass, retrieval regression is unchanged and the build succeeds. No live model calls.
+
 **Pages deployment (2026-10-08):** `.github/workflows/pages.yml` tests the demo, builds and verifies
 the exact `dist-demo` artifact, and publishes via the `github-pages` environment on relevant main
-pushes or manual dispatch. PR CI also runs `demo:build` and `demo:check`. Planned public URL:
+pushes or manual dispatch. PR CI also runs `demo:build` and `demo:check`. Live public URL:
 `https://ns-0437.github.io/readyspec/`. Operational notes and boundaries: `docs/pages-demo.md`.
 
 **Static demo foundation (2026-10-08):** `demo/` is a separate, browser-only TypeScript frontend.

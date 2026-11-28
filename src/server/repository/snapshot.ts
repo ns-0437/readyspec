@@ -17,17 +17,36 @@ export function readCommit(root: string): string | null {
   try {
     const gitDir = path.join(root, ".git");
     if (!fs.lstatSync(gitDir).isDirectory()) return null;
-    const head = fs.readFileSync(path.join(gitDir, "HEAD"), "utf8").trim();
+    // Compare real paths with real paths: a parent may be aliased (short name, junction, symlink).
+    const realGitDir = fs.realpathSync.native(gitDir);
+    const readGitFile = (file: string): string | null => {
+      try {
+        const stat = fs.lstatSync(file);
+        if (!stat.isFile() || !isInside(realGitDir, fs.realpathSync.native(file))) return null;
+        return fs.readFileSync(file, "utf8");
+      } catch {
+        return null;
+      }
+    };
+    // The repository walker excludes .git, so metadata reads must independently reject symlinks.
+    const head = readGitFile(path.join(gitDir, "HEAD"))?.trim();
+    if (!head) return null;
     if (/^[0-9a-f]{40}$/i.test(head)) return head;
     const m = /^ref:\s*(.+)$/.exec(head);
     if (!m?.[1]) return null;
     const ref = m[1];
+    if (!/^refs\/[A-Za-z0-9._/-]+$/.test(ref) || ref.split("/").includes("..")) return null;
     const loose = path.join(gitDir, ref);
-    if (isInside(gitDir, loose) && fs.existsSync(loose)) return fs.readFileSync(loose, "utf8").trim() || null;
+    if (isInside(gitDir, loose)) {
+      const value = readGitFile(loose)?.trim();
+      if (value && /^[0-9a-f]{40}$/i.test(value)) return value;
+    }
     const packed = path.join(gitDir, "packed-refs");
-    if (fs.existsSync(packed)) {
-      for (const line of fs.readFileSync(packed, "utf8").split("\n")) {
-        if (line.endsWith(` ${ref}`)) return line.split(" ")[0] ?? null;
+    const packedContents = readGitFile(packed);
+    if (packedContents) {
+      for (const line of packedContents.split("\n")) {
+        const match = /^([0-9a-f]{40})\s+(refs\/.+)$/.exec(line);
+        if (match?.[2] === ref) return match[1]!;
       }
     }
   } catch {

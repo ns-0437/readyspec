@@ -77,6 +77,11 @@ Keyword matching: a group matches when every term is present (each term may list
 alternatives). It is deliberately crude and auditable. The human rubric
 (`evals/rubrics/human-rubric.md`) is the authoritative judgement; model-based scoring is not used.
 
+For a human comparison, pair systems by case and repetition, compute the difference within each
+case first, then average across cases. Treat cases—not repeated outputs—as the independent units;
+report how many complete pairs contributed and list missing or partial results. This small,
+hand-authored set supports descriptive comparisons, not statistical significance claims.
+
 ## Running
 
 ```
@@ -107,7 +112,9 @@ npm run eval -- --pilot --dry-run --provider groq --provider-token-limit 8000
 npm run eval -- --pilot --provider groq --max-calls <N> --max-input-tokens <N> --max-output-tokens <N>
 ```
 
-Profiles: `--profile default|compact` sets per-stage output allowances (default 6000/4000/10000 and single prompt 6000, unchanged; compact 1500/1000/2500 and single prompt 2500, **initial hypotheses, not validated quality settings**). `--output-allowance stage=N,...` overrides single stages, and `--evidence-max-chars N` applies one retrieval budget to BOTH systems so they still receive identical excerpts. With both systems selected the single-prompt allowance must equal the brief allowance. `--dry-run` also reports system/schema overhead, the `--safety-margin` (default 10% on every input estimate; chars/4 is a heuristic, not tokenization), reserved output, retry exposure, the run-wide budget the plan needs, which stages fit `--provider-token-limit N`, and exactly which excerpts a shared evidence cap excludes (and whether the case's required files survive). A run on one case is labelled a feasibility check, not a quality benchmark.
+Profiles: `--profile default|compact` sets per-stage output allowances (default 6000/4000/10000 and single prompt 6000, unchanged; compact 1500/1000/2500 and single prompt 2500, **initial hypotheses, not validated quality settings**). `--output-allowance stage=N,...` overrides single stages, and `--evidence-max-chars N` applies one retrieval budget to BOTH systems so they still receive identical excerpts. With both systems selected the single-prompt allowance must equal the brief allowance. `--dry-run` also reports system/schema overhead, the `--safety-margin` (default 10% on every input estimate; chars/4 is a heuristic, not tokenization), reserved output, retry exposure, the run-wide budget the plan needs, which stages fit `--provider-token-limit N`, and exactly which excerpts a shared evidence cap excludes. "Required files retained" only means each
+required file has at least one surviving excerpt: a file can lose some of its excerpts and still count
+as retained, so the plan separately flags a required file that lost some but not all of its evidence. A run on one case is labelled a feasibility check, not a quality benchmark.
 
 Accounting: token and cost totals include failed outputs' known usage. A failed request's own usage is
 unavailable and never invented, so such totals are a known lower bound and cost prints as

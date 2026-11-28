@@ -92,8 +92,8 @@ pair, about 50 calls per run for the development set — comfortably enough to e
 quota in one run (it happened during step 2's manual UI check, on far fewer calls). Set
 `READYSPEC_MAX_CALLS` high enough for one session, and check spend/quota with your own plan first.
 
-Outputs: `evals/results/<provider>-dev-latest.md`, a raw JSON per run, and
-`human-scoring-sheet-dev.csv`. Fill the sheet using `evals/rubrics/human-rubric.md`.
+Outputs: `evals/results/<provider>-dev-latest.md` and, per run, a directory under `evals/results/runs/`
+with one raw JSON per result and `scoring-sheet.csv`. Fill the sheet using `evals/rubrics/human-rubric.md`.
 
 ## 4. Held-out set, once
 

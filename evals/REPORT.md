@@ -117,7 +117,7 @@ These are engineering tests (193 in `tests/`), not model-quality evidence:
    caps at 8000 tokens/minute account-wide, which a single `analyze` call can already exceed — a
    full eval run there may need a paid Dev Tier or a smaller prompt footprint per call.
 3. Freeze the code; run `--set heldout-v2` once (the only clean cohort left).
-4. Fill the generated `human-scoring-sheet-*.csv` using `evals/rubrics/human-rubric.md`, ideally
+4. Fill the `scoring-sheet.csv` generated inside that run's directory using `evals/rubrics/human-rubric.md`, ideally
    blind and by someone other than the author.
 5. Replace this "not measured" table with the results, keep the failures, and re-read
    `docs/evaluation.md` threats to validity before claiming anything.

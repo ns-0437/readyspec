@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ProviderInfo } from "@/shared/schemas";
 import { redactSecrets } from "@/shared/redact";
-import { CancelledError, ProviderError, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
+import { CancelledError, ProviderError, parseProviderJson, parseRetryAfterMs, type LlmProvider, type LlmRequest, type LlmResponse } from "./provider";
 
 // choices is required (not .optional()) so a body that isn't actually a chat-completion response
 // (e.g. an unexpected 200 with an unrelated shape) fails Zod validation and is correctly treated
@@ -99,7 +99,7 @@ export class GroqProvider implements LlmProvider {
       throw new ProviderError(`Model API returned ${res.status}${detail ? `: ${detail}` : ""}`, { retryable, status: res.status, retryAfterMs: parseRetryAfterMs(res.headers.get("retry-after")) });
     }
 
-    const parsed = GroqResponse.safeParse(await res.json());
+    const parsed = GroqResponse.safeParse(await parseProviderJson(res));
     if (!parsed.success) throw new ProviderError("Model API returned an unexpected response shape", { retryable: false });
     const choice = parsed.data.choices?.[0];
     const text = choice?.message?.content ?? "";
